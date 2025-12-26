@@ -107,6 +107,14 @@ dependencies {
     implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.0'
     //Eureka
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    //for span
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'net.ttddyy.observation:datasource-micrometer:1.0.3'
+    implementation 'io.github.openfeign:feign-micrometer:13.2'
+    implementation 'io.micrometer:micrometer-observation'
+    implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.0'
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-kafka-clients-2.6:2.11.0-alpha'
 }
 
 dependencyManagement {

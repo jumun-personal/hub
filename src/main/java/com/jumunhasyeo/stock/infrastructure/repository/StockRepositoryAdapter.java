@@ -5,10 +5,10 @@ import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.domain.entity.Stock;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +20,7 @@ public class StockRepositoryAdapter implements StockRepository {
 
     @Override
     public Optional<Stock> findByProductId(UUID productId) {
-        return jpaStockRepository.findByProductId(productId);
+        return Optional.ofNullable(jpaStockRepository.findByProductId(productId).get(0));
     }
 
     @Override
@@ -55,7 +55,11 @@ public class StockRepositoryAdapter implements StockRepository {
     }
 
     @Override
-    public Page<Stock> findAll(Pageable pageable) {
-        return jpaStockRepository.findAll(pageable);
+    public List<Stock> findNextBatch(LocalDateTime lastCreatedAt, UUID lastId, Pageable pageable) {
+        return jpaStockRepository.findNextBatch(
+                lastCreatedAt,
+                lastId,
+                pageable
+        );
     }
 }
