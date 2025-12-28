@@ -63,7 +63,7 @@ public class JpaStockRepositoryConcurrencyTest extends CommonTestContainer {
         );
 
         //then
-        Stock stock = jpaStockRepository.findByProductId(productId).orElse(null);
+        Stock stock = jpaStockRepository.findByProductId(productId).get(0);
         assertThat(successCount).isEqualTo(willSuccessCount);
         assertThat(stock.getQuantity()).isEqualTo(initQuantity - successCount);
     }
@@ -86,7 +86,7 @@ public class JpaStockRepositoryConcurrencyTest extends CommonTestContainer {
         );
 
         //then
-        Stock stock = jpaStockRepository.findByProductId(productId).orElse(null);
+        Stock stock = jpaStockRepository.findByProductId(productId).get(0);
         assertThat(successCount).isEqualTo(willSuccessCount);
         assertThat(stock.getQuantity()).isEqualTo(initQuantity + successCount);
     }

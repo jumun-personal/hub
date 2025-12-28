@@ -3,11 +3,18 @@ package com.jumunhasyeo.stock.application;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.CreateStockCommand;
+import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.DeleteStockCommand;
+import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
+import com.jumunhasyeo.stock.application.command.ShippedStockCommand;
+import com.jumunhasyeo.stock.application.command.StoreStockCommand;
+import com.jumunhasyeo.stock.application.dto.response.StockHistoryRes;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.application.service.HubClient;
 import com.jumunhasyeo.stock.application.service.ProductClient;
 import com.jumunhasyeo.stock.domain.entity.Stock;
+import com.jumunhasyeo.stock.domain.entity.StockHistory;
+import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StockService 단위 테스트")
@@ -33,6 +42,8 @@ class StockServiceTest {
     private StockVariationService stockVariationService;
     @Mock
     private StockRepository stockRepository;
+    @Mock
+    private StockHistoryRepository stockHistoryRepository;
     @Mock
     private HubClient hubClient;
     @Mock
@@ -186,5 +197,101 @@ class StockServiceTest {
         assertThatThrownBy(() -> stockService.delete(command))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_EXCEPTION);
+    }
+
+    @Test
+    @DisplayName("재고 감소는 productId 순서대로 처리한다.")
+    void decrement_should_sort_by_product_id() {
+        UUID p3 = UUID.fromString("00000000-0000-0000-0000-000000000003");
+        UUID p1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID p2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID hubId = UUID.randomUUID();
+
+        DecreaseStockCommand c3 = new DecreaseStockCommand(p3, 3);
+        DecreaseStockCommand c1 = new DecreaseStockCommand(p1, 1);
+        DecreaseStockCommand c2 = new DecreaseStockCommand(p2, 2);
+
+        StockRes r1 = StockRes.from(Stock.of(hubId, p1, 99));
+        StockRes r2 = StockRes.from(Stock.of(hubId, p2, 98));
+        StockRes r3 = StockRes.from(Stock.of(hubId, p3, 97));
+
+        given(stockVariationService.decrement(c1)).willReturn(r1);
+        given(stockVariationService.decrement(c2)).willReturn(r2);
+        given(stockVariationService.decrement(c3)).willReturn(r3);
+
+        List<StockRes> result = stockService.decrement("idem-key", List.of(c3, c1, c2));
+
+        assertThat(result).containsExactly(r1, r2, r3);
+        verify(stockVariationService).decrement(c1);
+        verify(stockVariationService).decrement(c2);
+        verify(stockVariationService).decrement(c3);
+    }
+
+    @Test
+    @DisplayName("재고 증가는 productId 순서대로 처리한다.")
+    void increment_should_sort_by_product_id() {
+        UUID p3 = UUID.fromString("00000000-0000-0000-0000-000000000003");
+        UUID p1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID p2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID hubId = UUID.randomUUID();
+
+        IncreaseStockCommand c3 = new IncreaseStockCommand(p3, 3);
+        IncreaseStockCommand c1 = new IncreaseStockCommand(p1, 1);
+        IncreaseStockCommand c2 = new IncreaseStockCommand(p2, 2);
+
+        StockRes r1 = StockRes.from(Stock.of(hubId, p1, 101));
+        StockRes r2 = StockRes.from(Stock.of(hubId, p2, 102));
+        StockRes r3 = StockRes.from(Stock.of(hubId, p3, 103));
+
+        given(stockVariationService.increment(c1)).willReturn(r1);
+        given(stockVariationService.increment(c2)).willReturn(r2);
+        given(stockVariationService.increment(c3)).willReturn(r3);
+
+        List<StockRes> result = stockService.increment("idem-key", List.of(c3, c1, c2));
+
+        assertThat(result).containsExactly(r1, r2, r3);
+        verify(stockVariationService).increment(c1);
+        verify(stockVariationService).increment(c2);
+        verify(stockVariationService).increment(c3);
+    }
+
+    @Test
+    @DisplayName("입고 이력 저장 후 StockHistoryRes로 변환한다.")
+    void store_should_save_histories_and_return_response() {
+        UUID hubId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        StoreStockCommand command = new StoreStockCommand(hubId, productId, 10);
+
+        StockHistory history = StockHistory.ofStore(hubId, productId, 10, "idem-store");
+        given(stockHistoryRepository.saveAll(any())).willReturn(List.of(history));
+
+        List<StockHistoryRes> result = stockService.store("idem-store", List.of(command));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).hubId()).isEqualTo(hubId);
+        assertThat(result.get(0).productId()).isEqualTo(productId);
+        assertThat(result.get(0).type()).isEqualTo(StockHistory.StockHistoryType.STORE.name());
+        assertThat(result.get(0).quantity()).isEqualTo(10);
+        verifyNoInteractions(stockVariationService);
+    }
+
+    @Test
+    @DisplayName("출고 이력 저장 후 StockHistoryRes로 변환한다.")
+    void shipped_should_save_histories_and_return_response() {
+        UUID hubId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        ShippedStockCommand command = new ShippedStockCommand(hubId, productId, 5);
+
+        StockHistory history = StockHistory.ofShipped(hubId, productId, 5, "idem-shipped");
+        given(stockHistoryRepository.saveAll(any())).willReturn(List.of(history));
+
+        List<StockHistoryRes> result = stockService.shipped("idem-shipped", List.of(command));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).hubId()).isEqualTo(hubId);
+        assertThat(result.get(0).productId()).isEqualTo(productId);
+        assertThat(result.get(0).type()).isEqualTo(StockHistory.StockHistoryType.SHIPPED.name());
+        assertThat(result.get(0).quantity()).isEqualTo(5);
+        verifyNoInteractions(stockVariationService);
     }
 }

@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static com.jumunhasyeo.product.fixtures.ProductFixture.getProduct;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ProductDomainTest {
 
@@ -58,5 +59,15 @@ public class ProductDomainTest {
         // then
         assertThat(product.getDeletedBy()).isEqualTo(1L);
         assertThat(product.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("삭제 사용자 ID가 null이면 예외가 발생한다.")
+    void delete_user_is_null_throws_exception() {
+        Product product = getProduct();
+
+        assertThatThrownBy(() -> product.delete(null))
+                .isInstanceOf(RuntimeException.class)
+                .hasFieldOrPropertyWithValue("errorCode", com.jumunhasyeo.common.exception.ErrorCode.USER_MUST_NOT_NULL);
     }
 }

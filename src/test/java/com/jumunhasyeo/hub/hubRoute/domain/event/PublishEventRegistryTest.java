@@ -13,4 +13,10 @@ class PublishEventRegistryTest {
         String eventName = PublishEventRegistry.of(HubRouteCreatedEvent.class.getSimpleName());
         assertEquals(HubRouteCreatedEvent.class.getSimpleName(), eventName);
     }
+
+    @Test
+    @DisplayName("of 메서드는 유효하지 않은 이벤트 이름에 대해 예외를 던진다.")
+    void of_invalidEventName_throwsException() {
+        assertThrows(IllegalArgumentException.class, () -> PublishEventRegistry.of("UnknownEvent"));
+    }
 }

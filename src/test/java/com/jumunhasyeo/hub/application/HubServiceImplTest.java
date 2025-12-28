@@ -13,6 +13,8 @@ import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
+import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
+import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -38,6 +40,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -304,5 +307,50 @@ public class HubServiceImplTest {
 
         //then
         assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.HUB_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("허브 이름이 변경되지 않으면 HubNameUpdatedEvent를 발행하지 않는다.")
+    void update_same_name_should_not_publish_name_updated() {
+        UUID hubId = UUID.randomUUID();
+        Hub savedHub = createHub(hubId);
+        UpdateHubCommand command = new UpdateHubCommand(hubId, savedHub.getName(), "새 주소", 33.3, 126.5);
+        when(hubRepository.findById(hubId)).thenReturn(Optional.of(savedHub));
+
+        hubService.update(command);
+
+        verify(eventPublisher, never()).publishEvent(any(HubNameUpdatedEvent.class));
+        verify(eventPublisher).publishEvent(any(HubUpdatedEvent.class));
+    }
+
+    @Test
+    @DisplayName("existById는 repository 결과를 그대로 반환한다.")
+    void existById_success() {
+        UUID hubId = UUID.randomUUID();
+        when(hubRepository.existById(hubId)).thenReturn(Boolean.TRUE);
+
+        Boolean result = hubService.existById(hubId);
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    @DisplayName("getAll은 전체 hub를 HubRes로 매핑한다.")
+    void getAll_success() {
+        Hub hub1 = createHub(UUID.randomUUID());
+        Hub hub2 = Hub.builder()
+                .hubId(UUID.randomUUID())
+                .centerHubRelations(new HashSet<>())
+                .branchHubRelations(new HashSet<>())
+                .name("강남 허브")
+                .hubType(HubType.BRANCH)
+                .address(Address.of("new street", Coordinate.of(37.1, 127.2)))
+                .build();
+        when(hubRepository.findAll()).thenReturn(List.of(hub1, hub2));
+
+        List<HubRes> result = hubService.getAll();
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(HubRes::id).containsExactly(hub1.getHubId(), hub2.getHubId());
     }
 }

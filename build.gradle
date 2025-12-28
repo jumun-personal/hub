@@ -175,12 +175,62 @@ jacocoTestReport {
                             "**/*Request*",
                             "**/*Response*",
                             "**/*Interceptor*",
-                            "**/*Exception*"
+                            "**/*Exception*",
+                            "com/jumunhasyeo/visualization/**"
                     ] + QDomains)
                 })
         )
     }
 }
+
+tasks.register('jacocoCoreTestReport', JacocoReport) {
+    dependsOn test
+
+    reports {
+        html.required = true
+        xml.required = true
+    }
+
+
+    def coreIncludes = [
+            "com/jumunhasyeo/**/domain/**",
+            "com/jumunhasyeo/**/application/**"
+    ]
+
+    def coreExcludes = [
+            "com/jumunhasyeo/visualization/**",
+            "**/*Adapter*Repository*",
+            "**/*Application*",
+            "**/*Config*",
+            "**/*Dto*",
+            "**/*Request*",
+            "**/*Response*",
+            "**/*Interceptor*",
+            "**/*Exception*",
+            "**/presentation/**",
+            "**/infrastructure/**",
+            "com/jumunhasyeo/common/**"
+    ]
+
+    // QueryDSL Q* 제외
+    def QDomains = []
+    for (qPattern in '**/QA'..'**/QZ') QDomains.add(qPattern + '*')
+
+    classDirectories.setFrom(
+            files(sourceSets.main.output.classesDirs.files.collect { classesDir ->
+                fileTree(dir: classesDir,
+                        includes: coreIncludes,
+                        excludes: coreExcludes + QDomains
+                )
+            })
+    )
+
+    sourceDirectories.setFrom files(sourceSets.main.allSource.srcDirs)
+    executionData.setFrom fileTree(buildDir).include(
+            "jacoco/test.exec", "outputs/unit_test_code_coverage/*.exec"
+    )
+}
+
 
 openApi {
     apiDocsUrl.set("http://localhost:8088/v3/api-docs")
