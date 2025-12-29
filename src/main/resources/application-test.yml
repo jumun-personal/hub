@@ -90,7 +90,7 @@ cache:
     hubService: true  # 테스트에서도 캐시 빈 생성  # 테스트에서는 캐시 비활성화 권장
 dynamic:
   enabled: true           # true: 런타임 전환 모드
-  hubCache: CAFFEINE      # CAFFEINE | REDIS | NONE
+  hubCache: REDIS         # REDIS | NONE
   stockLock: DEFAULT      # DEFAULT | PESSIMISTIC_LOCK
 # 외부 API 설정
 kakao:

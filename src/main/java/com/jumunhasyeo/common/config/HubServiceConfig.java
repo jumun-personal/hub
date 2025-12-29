@@ -1,6 +1,9 @@
 package com.jumunhasyeo.common.config;
 
-import com.jumunhasyeo.hub.hub.application.*;
+import com.jumunhasyeo.hub.hub.application.HubEventPublisher;
+import com.jumunhasyeo.hub.hub.application.HubRedisCachedDecoratorService;
+import com.jumunhasyeo.hub.hub.application.HubService;
+import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import lombok.extern.slf4j.Slf4j;
@@ -16,18 +19,6 @@ import org.springframework.context.annotation.Configuration;
 @Slf4j
 @ConditionalOnProperty(name = "dynamic.enabled", havingValue = "false", matchIfMissing = true)
 public class HubServiceConfig {
-
-    @Bean
-    @ConditionalOnProperty(name = "cache.config.hubService", havingValue = "CAFFEINE")
-    public HubService hubServiceCaffeine(
-            HubRepository hubRepository,
-            HubRepositoryCustom hubRepositoryCustom,
-            HubEventPublisher hubEventPublisher
-    ) {
-        log.info("[FixedCache] Creating HubService with Caffeine");
-        HubServiceImpl impl = new HubServiceImpl(hubRepository, hubRepositoryCustom, hubEventPublisher);
-        return new HubCaffeineCachedDecoratorService(impl);
-    }
 
     @Bean
     @ConditionalOnProperty(name = "cache.config.hubService", havingValue = "REDIS")
@@ -59,8 +50,8 @@ public class HubServiceConfig {
             HubRepositoryCustom hubRepositoryCustom,
             HubEventPublisher hubEventPublisher
     ) {
-        log.warn("[FixedCache] Fallback - Creating HubService with Caffeine");
+        log.warn("[FixedCache] Fallback - Creating HubService with Redis");
         HubServiceImpl impl = new HubServiceImpl(hubRepository, hubRepositoryCustom, hubEventPublisher);
-        return new HubCaffeineCachedDecoratorService(impl);
+        return new HubRedisCachedDecoratorService(impl);
     }
 }

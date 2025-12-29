@@ -16,9 +16,9 @@ public class DynamicConfig {
     
     /**
      * HubService 캐시 타입
-     * CAFFEINE | REDIS | NONE
+     * REDIS | NONE
      */
-    private String hubCache = HubServiceCacheType.CAFFEINE.name();
+    private String hubCache = HubServiceCacheType.REDIS.name();
 
     /**
      * StockVariationService 구현체 타입

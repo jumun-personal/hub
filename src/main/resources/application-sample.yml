@@ -82,7 +82,7 @@ logging:
 
 cache:
   config:
-    hubService: ${HUB_SERVICE_CACHEABLE:CAFFEINE}
+    hubService: ${HUB_SERVICE_CACHEABLE:REDIS}
 
 kakao:
   mobility:

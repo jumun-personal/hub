@@ -85,7 +85,7 @@ logging:
 # 동적 구현체 전환 설정
 dynamic:
   enabled: true           # true: 런타임 전환 모드
-  hubCache: CAFFEINE      # CAFFEINE | REDIS | NONE
+  hubCache: REDIS         # REDIS | NONE
   stockLock: DEFAULT      # DEFAULT | PESSIMISTIC_LOCK
 
 cache:

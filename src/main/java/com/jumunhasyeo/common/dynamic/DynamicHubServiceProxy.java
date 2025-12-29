@@ -40,9 +40,7 @@ public class DynamicHubServiceProxy implements HubService {
             if (service == this) continue;
             
             String className = service.getClass().getSimpleName();
-            if (className.contains("Caffeine")) {
-                implementations.put("CAFFEINE", service);
-            } else if (className.contains("Redis")) {
+            if (className.contains("Redis")) {
                 implementations.put("REDIS", service);
             } else if (className.equals("HubServiceImpl")) {
                 implementations.put("NONE", service);
@@ -57,8 +55,8 @@ public class DynamicHubServiceProxy implements HubService {
         HubService impl = implementations.get(active);
         
         if (impl == null) {
-            log.warn("[Dynamic] Unknown type '{}', fallback to CAFFEINE", active);
-            impl = implementations.get("CAFFEINE");
+            log.warn("[Dynamic] Unknown type '{}', fallback to REDIS", active);
+            impl = implementations.get("REDIS");
         }
         
         return impl;

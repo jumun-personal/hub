@@ -19,7 +19,7 @@ public class SwitchController {
     
     private final DynamicConfig config;
     
-    private static final Set<String> VALID_HUB_TYPES = Set.of("CAFFEINE", "REDIS", "NONE");
+    private static final Set<String> VALID_HUB_TYPES = Set.of("REDIS", "NONE");
     private static final Set<String> VALID_STOCK_TYPES = Set.of("DEFAULT", "PESSIMISTIC_LOCK");
     
     /**

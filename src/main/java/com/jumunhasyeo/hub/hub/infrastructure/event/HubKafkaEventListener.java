@@ -2,23 +2,17 @@ package com.jumunhasyeo.hub.hub.infrastructure.event;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.common.dynamic.DynamicConfig;
 import com.jumunhasyeo.common.util.KafkaUtil;
-import com.jumunhasyeo.hub.hub.application.HubCaffeineCachedDecoratorService;
-import com.jumunhasyeo.hub.hub.application.HubCaffeineCachedEvictService;
-import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
-import static com.jumunhasyeo.common.dynamic.HubServiceCacheType.CAFFEINE;
 import static com.jumunhasyeo.hub.hub.infrastructure.event.ListenEventRegistry.*;
 
 
@@ -27,8 +21,6 @@ import static com.jumunhasyeo.hub.hub.infrastructure.event.ListenEventRegistry.*
 @RequiredArgsConstructor
 public class HubKafkaEventListener {
 
-    private final DynamicConfig dynamicConfig;
-    private final HubCaffeineCachedEvictService evictService;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
@@ -50,23 +42,14 @@ public class HubKafkaEventListener {
 
     public void dispatch(String payload, String simpleClassName) throws JsonProcessingException {
         if (simpleClassName.equals(HUB_CREATED_EVENT.getEventName())) {
-            HubCreatedEvent hubCreatedEvent = objectMapper.readValue(payload, HubCreatedEvent.class);
-            if (CAFFEINE.name().equals(dynamicConfig.getHubCache())) {
-                evictService.evictAll();
-            }
+            objectMapper.readValue(payload, HubCreatedEvent.class);
         } else if (simpleClassName.equals(HUB_DELETED_EVENT.getEventName())) {
-            HubDeletedEvent hubDeletedEvent = objectMapper.readValue(payload, HubDeletedEvent.class);
-            if (CAFFEINE.name().equals(dynamicConfig.getHubCache())) {
-                evictService.evictEveryThings(hubDeletedEvent.getHubId());
-            }
+            objectMapper.readValue(payload, HubDeletedEvent.class);
         } else if (simpleClassName.equals(HUB_UPDATE_EVENT.getEventName())) {
-            HubUpdatedEvent hubUpdatedEvent = objectMapper.readValue(payload, HubUpdatedEvent.class);
-            if (CAFFEINE.name().equals(dynamicConfig.getHubCache())) {
-                evictService.evictAll();
-            }
+            objectMapper.readValue(payload, HubUpdatedEvent.class);
         } else {
             log.info("Unhandled event type: {}", simpleClassName);
             log.info("Unhandled event payload: {}", payload);
         }
-    }}
-
+    }
+}

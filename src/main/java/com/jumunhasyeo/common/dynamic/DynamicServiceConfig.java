@@ -1,6 +1,8 @@
 package com.jumunhasyeo.common.dynamic;
 
-import com.jumunhasyeo.hub.hub.application.*;
+import com.jumunhasyeo.hub.hub.application.HubEventPublisher;
+import com.jumunhasyeo.hub.hub.application.HubRedisCachedDecoratorService;
+import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import com.jumunhasyeo.stock.application.StockVariationServiceImpl;
@@ -32,12 +34,6 @@ public class DynamicServiceConfig {
     ) {
         log.info("[Dynamic] Creating HubServiceImpl");
         return new HubServiceImpl(hubRepository, hubRepositoryCustom, hubEventPublisher);
-    }
-    
-    @Bean
-    public HubCaffeineCachedDecoratorService hubCaffeineCached(HubServiceImpl hubServiceImpl) {
-        log.info("[Dynamic] Creating HubCaffeineCachedDecoratorService");
-        return new HubCaffeineCachedDecoratorService(hubServiceImpl);
     }
     
     @Bean

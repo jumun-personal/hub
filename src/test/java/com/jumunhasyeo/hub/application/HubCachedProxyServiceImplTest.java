@@ -17,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
@@ -32,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Transactional
 @Import(InternalIntegrationTestConfig.class)
-class HubCaffeineCachedDecoratorServiceIntegrationTest extends CommonTestContainer {
+class HubRedisCachedDecoratorServiceIntegrationTest extends CommonTestContainer {
 
     @Autowired
     private HubService hubService;
@@ -44,7 +43,6 @@ class HubCaffeineCachedDecoratorServiceIntegrationTest extends CommonTestContain
     private EntityManager entityManager;
 
     @Autowired
-    @Qualifier("caffeineCacheManager")
     private CacheManager cacheManager;
 
     @Autowired
