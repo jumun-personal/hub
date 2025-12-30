@@ -1,5 +1,6 @@
 package com.jumunhasyeo.stock.application;
 
+import com.jumunhasyeo.common.dynamic.StockLockType;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
@@ -33,6 +34,12 @@ class StockVariationServiceImplTest {
     private EntityManager entityManager;
     @InjectMocks
     private StockVariationServiceImpl stockService;
+
+    @Test
+    @DisplayName("전략 타입은 DEFAULT이다.")
+    void strategy_type_default() {
+        assertThat(stockService.type()).isEqualTo(StockLockType.DEFAULT);
+    }
 
     @Test
     @DisplayName("hub에 상품재고를 감소시킬 수 있다.")

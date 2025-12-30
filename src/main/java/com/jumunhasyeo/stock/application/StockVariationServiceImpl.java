@@ -1,5 +1,6 @@
 package com.jumunhasyeo.stock.application;
 
+import com.jumunhasyeo.common.dynamic.StockLockType;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
@@ -9,6 +10,8 @@ import com.jumunhasyeo.stock.domain.entity.Stock;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -17,10 +20,17 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Primary
+@Qualifier("stockVariationStrategy")
+@ConditionalOnProperty(name = "dynamic.enabled", havingValue = "false", matchIfMissing = true)
 public class StockVariationServiceImpl implements StockVariationService {
 
     private final StockRepository stockRepository;
     private final EntityManager entityManager;
+
+    @Override
+    public StockLockType type() {
+        return StockLockType.DEFAULT;
+    }
 
     @Override
     public StockRes decrement(DecreaseStockCommand command) {

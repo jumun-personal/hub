@@ -9,9 +9,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * 동적 StockVariationService 프록시
  * 
@@ -25,39 +22,30 @@ import java.util.Map;
 public class DynamicStockVariationServiceProxy implements StockVariationService {
     
     private final DynamicConfig config;
-    private final Map<String, StockVariationService> implementations;
+    private final StockVariationStrategyRegistry strategyRegistry;
     
     public DynamicStockVariationServiceProxy(
             DynamicConfig config,
-            List<StockVariationService> stockServices
+            StockVariationStrategyRegistry strategyRegistry
     ) {
         this.config = config;
-        this.implementations = new java.util.HashMap<>();
-        
-        for (StockVariationService service : stockServices) {
-            if (service == this) continue;
-            
-            String className = service.getClass().getSimpleName();
-            if (className.contains("PessimisticLock")) {
-                implementations.put("PESSIMISTIC_LOCK", service);
-            } else if (className.equals("StockVariationServiceImpl")) {
-                implementations.put("DEFAULT", service);
-            }
-        }
-        
-        log.info("[Dynamic] StockVariationService Proxy initialized: {}", implementations.keySet());
+        this.strategyRegistry = strategyRegistry;
     }
-    
+
+    @Override
+    public StockLockType type() {
+        return StockLockType.DEFAULT;
+    }
+
     private StockVariationService resolve() {
-        String active = config.getStockLock().toUpperCase();
-        StockVariationService impl = implementations.get(active);
-        
-        if (impl == null) {
-            log.warn("[Dynamic] Unknown stock type '{}', fallback to DEFAULT", active);
-            impl = implementations.get("DEFAULT");
+        String activeRaw = config.getStockLock();
+        try {
+            StockLockType activeType = StockLockType.valueOf(activeRaw.toUpperCase());
+            return strategyRegistry.resolve(activeType);
+        } catch (Exception e) {
+            log.warn("[Dynamic] Unknown stock type '{}', fallback to DEFAULT", activeRaw);
+            return strategyRegistry.resolve(StockLockType.DEFAULT);
         }
-        
-        return impl;
     }
     
     @Override
