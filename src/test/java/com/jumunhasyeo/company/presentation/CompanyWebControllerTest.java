@@ -1,22 +1,15 @@
 package com.jumunhasyeo.company.presentation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.ControllerTestConfig;
-import com.jumunhasyeo.common.exception.GlobalExceptionHandler;
-import com.jumunhasyeo.company.application.CompanyService;
 import com.jumunhasyeo.company.application.dto.response.CompanyRes;
 import com.jumunhasyeo.company.domain.entity.CompanyType;
 import com.jumunhasyeo.company.presentation.dto.request.CreateCompanyReq;
 import com.jumunhasyeo.company.presentation.dto.request.DeleteCompanyReq;
 import com.jumunhasyeo.company.presentation.dto.request.UpdateCompanyReq;
+import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
+import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,17 +20,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(CompanyWebController.class)
-@Import({ControllerTestConfig.class, GlobalExceptionHandler.class})
-class CompanyWebControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @MockitoBean
-    private CompanyService companyService;
-
+@UnifiedControllerSliceTest
+class CompanyWebControllerTest extends AbstractControllerWebMvcTest {
     @Test
     @DisplayName("업체를 생성할 수 있다.")
     void create_success() throws Exception {

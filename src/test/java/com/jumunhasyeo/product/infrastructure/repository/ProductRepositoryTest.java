@@ -1,8 +1,5 @@
 package com.jumunhasyeo.product.infrastructure.repository;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.RepositoryTestConfig;
 import com.jumunhasyeo.product.application.command.SearchProductCommand;
 import com.jumunhasyeo.product.application.dto.ProductRes;
 import com.jumunhasyeo.product.domain.entity.Product;
@@ -11,14 +8,10 @@ import com.jumunhasyeo.product.domain.vo.Price;
 import com.jumunhasyeo.product.domain.vo.ProductDescription;
 import com.jumunhasyeo.product.domain.vo.ProductName;
 import com.jumunhasyeo.product.presentation.dto.req.ProductSearchCondition;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
@@ -28,27 +21,16 @@ import java.util.UUID;
 import static com.jumunhasyeo.product.fixtures.ProductFixture.getProduct;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({CleanUp.class, RepositoryTestConfig.class})
-public class ProductRepositoryTest extends CommonTestContainer {
+public class ProductRepositoryTest extends AbstractJpaRepositoryTest {
 
     @Autowired
     private JpaProductRepository jpaProductRepository;
 
-    @Autowired
-    private CleanUp cleanUp;
-
-    @Autowired
-    private TestEntityManager em;
-
     UUID companyId1 = UUID.randomUUID();
     UUID companyId2 = UUID.randomUUID();
 
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-
+    @Override
+    protected void beforeEachAfterTruncate() {
         Product product1 = Product.create(CompanyId.of(companyId1), ProductName.of("상품A"), ProductDescription.of("설명A"), Price.of(10000));
         Product product2 = Product.create(CompanyId.of(companyId1), ProductName.of("상품B"), ProductDescription.of("설명B"), Price.of(5000));
         Product product3 = Product.create(CompanyId.of(companyId2), ProductName.of("상품C"), ProductDescription.of("설명C"), Price.of(500));
@@ -56,8 +38,8 @@ public class ProductRepositoryTest extends CommonTestContainer {
 
         jpaProductRepository.saveAll(List.of(product1, product2, product3, product4));
 
-        em.flush();
-        em.clear();
+        testEntityManager.flush();
+        testEntityManager.clear();
     }
 
     @Test

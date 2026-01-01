@@ -1,48 +1,36 @@
 package com.jumunhasyeo.hub.hubRoute.infrastructure.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
+import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 
-@SpringBootTest
-@Import({CleanUp.class, InternalIntegrationTestConfig.class})
-public class HubRouteKafkaEventListenerIntegrationTest extends CommonTestContainer {
+public class HubRouteKafkaEventListenerIntegrationTest extends AbstractEventDispatchIntegrationTest {
 
     @Autowired
     private HubRouteKafkaEventListener hubRouteKafkaEventListener;
 
-    @MockitoBean
-    private HubRouteEventHandler hubRouteEventHandler;
-
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private CleanUp cleanUp;
-
     @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
+    void resetHandlers() {
+        reset(hubRouteEventHandler);
     }
 
     @Test
@@ -58,7 +46,7 @@ public class HubRouteKafkaEventListenerIntegrationTest extends CommonTestContain
         hubRouteKafkaEventListener.dispatch(payload, simpleClassName);
 
         //then
-        then(hubRouteEventHandler).should().hubCreated(any(HubCreatedEvent.class));
+        then(hubRouteEventHandler).should(times(1)).hubCreated(any(HubCreatedEvent.class));
     }
 
     @Test
@@ -74,7 +62,7 @@ public class HubRouteKafkaEventListenerIntegrationTest extends CommonTestContain
         hubRouteKafkaEventListener.dispatch(payload, simpleClassName);
 
         //then
-        then(hubRouteEventHandler).should().hubDeleted(any(HubDeletedEvent.class));
+        then(hubRouteEventHandler).should(times(1)).hubDeleted(any(HubDeletedEvent.class));
     }
 
     private static Hub createHub() {

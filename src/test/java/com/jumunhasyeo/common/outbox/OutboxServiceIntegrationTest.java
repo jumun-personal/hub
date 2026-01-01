@@ -1,22 +1,16 @@
 package com.jumunhasyeo.common.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,9 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 
-@SpringBootTest
-@Import({CleanUp.class, InternalIntegrationTestConfig.class})
-public class OutboxServiceIntegrationTest extends CommonTestContainer {
+public class OutboxServiceIntegrationTest extends AbstractEventDispatchIntegrationTest {
 
     @Autowired
     private OutboxService outboxService;
@@ -40,17 +32,6 @@ public class OutboxServiceIntegrationTest extends CommonTestContainer {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private OutboxDispatcher outboxDispatcher;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("HubCreatedEvent를 저장하고 조회할 수 있다.")

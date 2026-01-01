@@ -1,43 +1,22 @@
 package com.jumunhasyeo.common.Idempotency.db.domain.repository;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.RepositoryTestConfig;
 import com.jumunhasyeo.common.Idempotency.db.domain.DbIdempotentKey;
 import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.Idempotency.db.infrastructure.repository.IdempotentKeyRepositoryAdapter;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({IdempotentKeyRepositoryAdapter.class, CleanUp.class, RepositoryTestConfig.class})
-class IdempotencyKeyRepositoryTest extends CommonTestContainer {
+class IdempotencyKeyRepositoryTest extends AbstractJpaRepositoryTest {
 
     @Autowired
     private IdempotentKeyRepositoryAdapter repository;
-
-    @Autowired
-    private TestEntityManager testEntityManager;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("멱등키를 저장할 수 있다.")

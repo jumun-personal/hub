@@ -1,21 +1,14 @@
 package com.jumunhasyeo.stock.presentaion;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.ControllerTestConfig;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.common.exception.GlobalExceptionHandler;
-import com.jumunhasyeo.stock.application.StockService;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.presentation.StockWebController;
 import com.jumunhasyeo.stock.presentation.dto.request.*;
+import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
+import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,16 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(StockWebController.class)
-@Import({ControllerTestConfig.class, GlobalExceptionHandler.class})
-class StockWebControllerTest {
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @MockitoBean
-    private StockService stockService;
-
+@UnifiedControllerSliceTest
+class StockWebControllerTest extends AbstractControllerWebMvcTest {
     @Test
     @DisplayName("재고 생성 API로 재고 생성을 요청할 수 있다.")
     void create_stock_success() throws Exception {

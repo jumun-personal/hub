@@ -1,8 +1,5 @@
 package com.jumunhasyeo.hub.application;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.command.DeleteHubCommand;
 import com.jumunhasyeo.hub.hub.application.command.UpdateHubCommand;
@@ -11,15 +8,12 @@ import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
+import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +22,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Transactional
-@Import(InternalIntegrationTestConfig.class)
-class HubRedisCachedDecoratorServiceIntegrationTest extends CommonTestContainer {
+class HubRedisCachedDecoratorServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private HubService hubService;
@@ -48,17 +40,13 @@ class HubRedisCachedDecoratorServiceIntegrationTest extends CommonTestContainer 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
+    @Override
+    protected void beforeEachAfterTruncate() {
         clearAllCaches();
     }
 
-    @AfterEach
-    void tearDown() {
+    @Override
+    protected void afterEachCleanup() {
         clearAllCaches();
     }
 

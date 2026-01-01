@@ -1,8 +1,5 @@
 package com.jumunhasyeo.hub.hub.application;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.common.outbox.JpaOutboxRepository;
 import com.jumunhasyeo.common.outbox.OutboxEvent;
 import com.jumunhasyeo.common.outbox.OutboxStatus;
@@ -13,12 +10,10 @@ import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,23 +21,13 @@ import java.util.UUID;
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_CREATED_EVENT;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@Import({CleanUp.class, InternalIntegrationTestConfig.class})
-public class HubEventListenerIntegrationTest extends CommonTestContainer {
+public class HubEventListenerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private HubEventListener hubEventListener;
 
     @Autowired
     private JpaOutboxRepository jpaOutboxRepository;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("HubCreatedEvent를 수신하면 Outbox에 저장된다.")

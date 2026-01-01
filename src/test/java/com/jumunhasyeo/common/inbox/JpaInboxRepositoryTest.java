@@ -1,16 +1,9 @@
 package com.jumunhasyeo.common.inbox;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.RepositoryTestConfig;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,24 +11,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({InboxRepositoryAdapter.class, CleanUp.class, RepositoryTestConfig.class})
-class JpaInboxRepositoryTest extends CommonTestContainer {
+class JpaInboxRepositoryTest extends AbstractJpaRepositoryTest {
 
     @Autowired
     private JpaInboxRepository jpaInboxRepository;
-
-    @Autowired
-    private TestEntityManager testEntityManager;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("InboxEvent를 저장할 수 있다.")

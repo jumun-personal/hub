@@ -1,39 +1,26 @@
 package com.jumunhasyeo.e2e;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.CreateHubReq;
+import com.jumunhasyeo.testsupport.AbstractHttpIntegrationTest;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Import;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
-
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import({CleanUp.class, InternalIntegrationTestConfig.class})
-public class HubApiIntegrationTest extends CommonTestContainer {
+public class HubApiIntegrationTest extends AbstractHttpIntegrationTest {
 
     @LocalServerPort
     private int port;
 
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
+    @Override
+    protected void beforeEachAfterTruncate() {
         RestAssured.port = port;
     }
 

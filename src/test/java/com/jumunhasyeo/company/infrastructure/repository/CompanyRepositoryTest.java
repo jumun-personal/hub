@@ -1,19 +1,12 @@
 package com.jumunhasyeo.company.infrastructure.repository;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.RepositoryTestConfig;
 import com.jumunhasyeo.company.domain.entity.Company;
 import com.jumunhasyeo.company.domain.entity.CompanyType;
 import com.jumunhasyeo.company.domain.repository.CompanyRepository;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,23 +14,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({CompanyRepositoryAdapter.class, CleanUp.class, RepositoryTestConfig.class})
-class CompanyRepositoryTest extends CommonTestContainer {
+class CompanyRepositoryTest extends AbstractJpaRepositoryTest {
 
     @Autowired
     private CompanyRepository companyRepository;
-    @Autowired
-    private TestEntityManager em;
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
-
     @Test
     @DisplayName("업체를 저장할 수 있다.")
     void save_success() {
@@ -57,7 +37,7 @@ class CompanyRepositoryTest extends CommonTestContainer {
     void findById_success() {
         //given
         Company company = createCompany("테스트업체");
-        em.persistAndFlush(company);
+        testEntityManager.persistAndFlush(company);
 
         //when
         Optional<Company> found = companyRepository.findById(company.getCompanyId());
@@ -73,7 +53,7 @@ class CompanyRepositoryTest extends CommonTestContainer {
         //given
         Company company = createCompany("테스트업체");
         company.delete(1L);
-        em.persistAndFlush(company);
+        testEntityManager.persistAndFlush(company);
 
         //when
         Optional<Company> found = companyRepository.findById(company.getCompanyId());
@@ -86,8 +66,8 @@ class CompanyRepositoryTest extends CommonTestContainer {
     @DisplayName("모든 업체를 조회할 수 있다.")
     void findAll_success() {
         //given
-        em.persistAndFlush(createCompany("업체1"));
-        em.persistAndFlush(createCompany("업체2"));
+        testEntityManager.persistAndFlush(createCompany("업체1"));
+        testEntityManager.persistAndFlush(createCompany("업체2"));
 
         //when
         List<Company> companies = companyRepository.findAll();
@@ -101,7 +81,7 @@ class CompanyRepositoryTest extends CommonTestContainer {
     void existsById_success() {
         //given
         Company company = createCompany("테스트업체");
-        em.persistAndFlush(company);
+        testEntityManager.persistAndFlush(company);
 
         //when
         boolean exists = companyRepository.existsById(company.getCompanyId());
@@ -116,7 +96,7 @@ class CompanyRepositoryTest extends CommonTestContainer {
         //given
         Company company = createCompany("테스트업체");
         company.delete(1L);
-        em.persistAndFlush(company);
+        testEntityManager.persistAndFlush(company);
 
         //when
         boolean exists = companyRepository.existsById(company.getCompanyId());
@@ -131,7 +111,7 @@ class CompanyRepositoryTest extends CommonTestContainer {
         //given
         UUID hubId = UUID.randomUUID();
         Company company = createCompanyWithHub("테스트업체", hubId);
-        em.persistAndFlush(company);
+        testEntityManager.persistAndFlush(company);
 
         //when
         boolean exists = companyRepository.existsByIdAndHubId(company.getCompanyId(), hubId);
@@ -145,7 +125,7 @@ class CompanyRepositoryTest extends CommonTestContainer {
     void existsByIdAndHubId_false() {
         //given
         Company company = createCompany("테스트업체");
-        em.persistAndFlush(company);
+        testEntityManager.persistAndFlush(company);
 
         //when
         boolean exists = companyRepository.existsByIdAndHubId(company.getCompanyId(), UUID.randomUUID());

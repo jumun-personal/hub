@@ -1,19 +1,12 @@
 package com.jumunhasyeo.hubRoute.presentation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.ControllerTestConfig;
-import com.jumunhasyeo.common.exception.GlobalExceptionHandler;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
-import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.presentation.HubRouteInternalWebController;
+import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
+import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,16 +16,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(HubRouteInternalWebController.class)
-@Import({ControllerTestConfig.class, GlobalExceptionHandler.class})
-class HubRouteInternalWebControllerTest {
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @MockitoBean
-    private HubRouteService hubRouteService;
-
+@UnifiedControllerSliceTest
+class HubRouteInternalWebControllerTest extends AbstractControllerWebMvcTest {
     @Test
     @DisplayName("허브 경로 전체 조회 API로 모든 허브 경로를 조회할 수 있다.")
     void get_all_routes_success() throws Exception {

@@ -1,18 +1,11 @@
 package com.jumunhasyeo.common.inbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.stock.infrastructure.event.OrderCancelEvent;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,9 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 
-@SpringBootTest
-@Import({CleanUp.class, InternalIntegrationTestConfig.class})
-public class InboxServiceIntegrationTest extends CommonTestContainer {
+public class InboxServiceIntegrationTest extends AbstractEventDispatchIntegrationTest {
 
     @Autowired
     private InboxService inboxService;
@@ -34,17 +25,6 @@ public class InboxServiceIntegrationTest extends CommonTestContainer {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private InboxDispatcher inboxDispatcher;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("OrderCancelEvent를 저장하고 조회할 수 있다.")

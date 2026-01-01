@@ -1,16 +1,10 @@
 package com.jumunhasyeo.stock.infrastructure.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -18,26 +12,13 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
 
-@SpringBootTest
-@Import({CleanUp.class, InternalIntegrationTestConfig.class})
-public class KafkaStockEventListenerIntegrationTest extends CommonTestContainer {
+public class KafkaStockEventListenerIntegrationTest extends AbstractEventDispatchIntegrationTest {
 
     @Autowired
     private KafkaStockEventListener kafkaStockEventListener;
 
-    @MockitoBean
-    private OrderCompensateHandler orderCompensateHandler;
-
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("OrderCancelEvent를 수신하고 처리할 수 있다.")

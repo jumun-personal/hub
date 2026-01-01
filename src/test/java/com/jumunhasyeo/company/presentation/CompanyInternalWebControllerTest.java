@@ -1,16 +1,9 @@
 package com.jumunhasyeo.company.presentation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.ControllerTestConfig;
-import com.jumunhasyeo.common.exception.GlobalExceptionHandler;
-import com.jumunhasyeo.company.application.CompanyService;
+import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
+import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
@@ -19,17 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(CompanyInternalWebController.class)
-@Import({ControllerTestConfig.class, GlobalExceptionHandler.class})
-class CompanyInternalWebControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @MockitoBean
-    private CompanyService companyService;
-
+@UnifiedControllerSliceTest
+class CompanyInternalWebControllerTest extends AbstractControllerWebMvcTest {
     @Test
     @DisplayName("업체 존재 여부를 검증할 수 있다 - 존재하는 경우")
     void exists_true() throws Exception {

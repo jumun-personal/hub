@@ -1,19 +1,14 @@
 package com.jumunhasyeo.stock.infrastructure.repository;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.stock.domain.entity.Stock;
+import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
@@ -25,9 +20,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@Import(InternalIntegrationTestConfig.class)
-public class JpaStockRepositoryConcurrencyTest extends CommonTestContainer {
+public class JpaStockRepositoryConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private JpaStockRepository jpaStockRepository;
@@ -37,14 +30,6 @@ public class JpaStockRepositoryConcurrencyTest extends CommonTestContainer {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("재고 감소 동시성(원자성) 확인")

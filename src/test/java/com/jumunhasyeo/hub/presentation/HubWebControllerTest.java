@@ -1,28 +1,21 @@
 package com.jumunhasyeo.hub.presentation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.ControllerTestConfig;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.common.exception.GlobalExceptionHandler;
-import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.presentation.HubWebController;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.CreateHubReq;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.DeleteHubReq;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.UpdateHubReq;
+import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
+import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
@@ -34,16 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(HubWebController.class)
-@Import({ControllerTestConfig.class, GlobalExceptionHandler.class})
-class HubWebControllerTest {
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @MockitoBean
-    private HubService hubService;
-
+@UnifiedControllerSliceTest
+class HubWebControllerTest extends AbstractControllerWebMvcTest {
     @Test
     @DisplayName("허브 생성 API로 허브 생성을 요청할 수 있다.")
     void create_hub_success() throws Exception {

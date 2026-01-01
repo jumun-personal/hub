@@ -1,24 +1,16 @@
 package com.jumunhasyeo.stock.infrastructure.repository;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.RepositoryTestConfig;
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepository;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepositoryCustom;
-import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepositoryCustomImpl;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,28 +19,18 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaHubRepositoryCustomImpl.class, RepositoryTestConfig.class, CleanUp.class})
-class JpaStockRepositoryCustomImplTest extends CommonTestContainer {
+class JpaStockRepositoryCustomImplTest extends AbstractJpaRepositoryTest {
 
     @Autowired
     private JpaHubRepository hubRepository;
 
     @Autowired
-    private TestEntityManager entityManager;
-
-    @Autowired
     private JpaHubRepositoryCustom hubRepositoryCustom;
-
-    @Autowired
-    private CleanUp cleanUp;
 
     private UUID product1;
 
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
+    @Override
+    protected void beforeEachAfterTruncate() {
         product1 = UUID.randomUUID();
 
         // 테스트 데이터 생성
@@ -179,7 +161,7 @@ class JpaStockRepositoryCustomImplTest extends CommonTestContainer {
     public void search_deleted_notfound() {
         Hub hub = createHub("송파허브", "송파대로", 12.6, 15.4);
         hub.markDeleted(1L);
-        entityManager.persistAndFlush(hub);
+        testEntityManager.persistAndFlush(hub);
 
         HubSearchCondition condition = HubSearchCondition.builder()
                 .name("송파허브")

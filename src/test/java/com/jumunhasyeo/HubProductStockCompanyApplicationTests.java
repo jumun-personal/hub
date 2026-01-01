@@ -1,12 +1,9 @@
 package com.jumunhasyeo;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
+import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
 
-@SpringBootTest
-@Import(InternalIntegrationTestConfig.class)
-class HubProductStockCompanyApplicationTests extends CommonTestContainer {
+class HubProductStockCompanyApplicationTests extends AbstractIntegrationTest {
 
     @Test
     void contextLoads() {

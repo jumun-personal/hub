@@ -1,8 +1,5 @@
 package com.jumunhasyeo.hubRoute.infrastructure.repository;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.RepositoryTestConfig;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -10,37 +7,20 @@ import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.repository.JpaHubRouteRepositoryImpl;
-import org.junit.jupiter.api.BeforeEach;
+import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({CleanUp.class, RepositoryTestConfig.class})
-class JpaHubRouteRepositoryTest extends CommonTestContainer {
+class JpaHubRouteRepositoryTest extends AbstractJpaRepositoryTest {
 
     @Autowired
     private JpaHubRouteRepositoryImpl hubRouteRepository;
-    @Autowired
-    private TestEntityManager em;
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
-
     @Test
     @DisplayName("시작 허브 또는 종료 허브로 경로를 조회할 수 있다.")
     void findByStartHubOrEndHub_success() {
@@ -48,12 +28,12 @@ class JpaHubRouteRepositoryTest extends CommonTestContainer {
         Hub hub1 = createHub("서울");
         Hub hub2 = createHub("부산");
         Hub hub3 = createHub("대전");
-        em.persist(hub1);
-        em.persist(hub2);
-        em.persist(hub3);
-        em.persist(createRoute(hub1, hub2));
-        em.persist(createRoute(hub2, hub3));
-        em.flush();
+        testEntityManager.persist(hub1);
+        testEntityManager.persist(hub2);
+        testEntityManager.persist(hub3);
+        testEntityManager.persist(createRoute(hub1, hub2));
+        testEntityManager.persist(createRoute(hub2, hub3));
+        testEntityManager.flush();
 
         //when
         List<HubRoute> routes = hubRouteRepository.findByStartHubOrEndHub(hub1, hub1);
@@ -68,12 +48,12 @@ class JpaHubRouteRepositoryTest extends CommonTestContainer {
         //given
         Hub hub1 = createHub("서울");
         Hub hub2 = createHub("부산");
-        em.persist(hub1);
-        em.persist(hub2);
+        testEntityManager.persist(hub1);
+        testEntityManager.persist(hub2);
         HubRoute route = createRoute(hub1, hub2);
         route.markDeleted(1L);
-        em.persist(route);
-        em.flush();
+        testEntityManager.persist(route);
+        testEntityManager.flush();
 
         //when
         List<HubRoute> routes = hubRouteRepository.findByStartHubOrEndHub(hub1, hub1);
@@ -88,11 +68,11 @@ class JpaHubRouteRepositoryTest extends CommonTestContainer {
         //given
         Hub hub1 = createHub("서울");
         Hub hub2 = createHub("부산");
-        em.persist(hub1);
-        em.persist(hub2);
-        em.persist(createRoute(hub1, hub2));
-        em.persist(createRoute(hub2, hub1));
-        em.flush();
+        testEntityManager.persist(hub1);
+        testEntityManager.persist(hub2);
+        testEntityManager.persist(createRoute(hub1, hub2));
+        testEntityManager.persist(createRoute(hub2, hub1));
+        testEntityManager.flush();
 
         //when
         List<HubRoute> routes = hubRouteRepository.findAll();
@@ -107,13 +87,13 @@ class JpaHubRouteRepositoryTest extends CommonTestContainer {
         //given
         Hub hub1 = createHub("서울");
         Hub hub2 = createHub("부산");
-        em.persist(hub1);
-        em.persist(hub2);
-        em.flush();
+        testEntityManager.persist(hub1);
+        testEntityManager.persist(hub2);
+        testEntityManager.flush();
 
         //when
         hubRouteRepository.insertIgnore(hub1.getHubId(), hub2.getHubId(), 300.0, 180);
-        em.clear();
+        testEntityManager.clear();
 
         //then
         List<HubRoute> routes = hubRouteRepository.findAll();
@@ -126,14 +106,14 @@ class JpaHubRouteRepositoryTest extends CommonTestContainer {
         //given
         Hub hub1 = createHub("서울");
         Hub hub2 = createHub("부산");
-        em.persist(hub1);
-        em.persist(hub2);
-        em.flush();
+        testEntityManager.persist(hub1);
+        testEntityManager.persist(hub2);
+        testEntityManager.flush();
 
         //when
         hubRouteRepository.insertIgnore(hub1.getHubId(), hub2.getHubId(), 300.0, 180);
         hubRouteRepository.insertIgnore(hub1.getHubId(), hub2.getHubId(), 400.0, 200);
-        em.clear();
+        testEntityManager.clear();
 
         //then
         List<HubRoute> routes = hubRouteRepository.findAll();

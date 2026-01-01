@@ -1,8 +1,5 @@
 package com.jumunhasyeo.stock.application;
 
-import com.jumunhasyeo.CleanUp;
-import com.jumunhasyeo.CommonTestContainer;
-import com.jumunhasyeo.InternalIntegrationTestConfig;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
@@ -10,26 +7,21 @@ import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.domain.entity.Stock;
+import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(InternalIntegrationTestConfig.class)
-public class StockVariationServiceImplIntegrationTest extends CommonTestContainer {
+public class StockVariationServiceImplIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private StockVariationServiceImpl stockService;
 
@@ -41,14 +33,6 @@ public class StockVariationServiceImplIntegrationTest extends CommonTestContaine
 
     @Autowired
     private TransactionTemplate transactionTemplate;
-
-    @Autowired
-    private CleanUp cleanUp;
-
-    @BeforeEach
-    void setUp() {
-        cleanUp.truncateAll();
-    }
 
     @Test
     @DisplayName("decreaseStock() 실행시 변경 감지를 차단해 중복 쿼리가 발생되지 않는다.")
