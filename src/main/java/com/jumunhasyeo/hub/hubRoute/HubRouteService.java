@@ -1,4 +1,4 @@
-package com.jumunhasyeo.hub.hubRoute.application.service;
+package com.jumunhasyeo.hub.hubRoute;
 
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
@@ -7,8 +7,12 @@ import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
+import com.jumunhasyeo.hub.hubRoute.application.dto.ProviderHint;
+import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
-import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightRes;
+import com.jumunhasyeo.hub.hubRoute.application.dto.request.RouteWeightQuery;
+import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightApiService;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
@@ -41,25 +45,31 @@ public class HubRouteService {
      */
     @Transactional
     public void buildRoutesForNewHub(BuildRouteCommand command) {
-        Set<HubRoute> hubRoutes = new HashSet<>();
-        HubType type = command.type();
-        if (type == HubType.CENTER) {
-            hubRoutes.addAll(buildForCenter(command));
-        } else if (type == HubType.BRANCH) {
-            hubRoutes.addAll(buildForBranch(command));
-        }
+        try {
+            Set<HubRoute> hubRoutes = new HashSet<>();
+            HubType type = command.type();
+            if (type == HubType.CENTER) {
+                hubRoutes.addAll(buildForCenter(command));
+            } else if (type == HubType.BRANCH) {
+                hubRoutes.addAll(buildForBranch(command));
+            }
 
-        List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
-                .map(HubRouteCreatedEvent::from)
-                .collect(Collectors.toList());
-        hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
+            List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
+                    .map(HubRouteCreatedEvent::from)
+                    .collect(Collectors.toList());
+            hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
+            hubRouteEventPublisher.publishRouteBuildCompleted(command);
+        } catch (Exception e) {
+            log.error("HubRoute build failed for hubId: {}", command.hubId(), e);
+            hubRouteEventPublisher.publishRouteBuildFailed(command, e.getMessage());
+        }
     }
 
     /**
      * 중앙 허브에 대한 경로 생성
      */
     private Set<HubRoute> buildForCenter(BuildRouteCommand command) {
-        Hub newCenterHub = getHub(command.hubId());
+        Hub newCenterHub = getHubIncludingCreating(command.hubId());
         List<Hub> existingCenterHubs = hubRepository.findAllByHubType(HubType.CENTER)
                 .stream()
                 .filter(hub -> !hub.getHubId().equals(newCenterHub.getHubId()))  // 자기 자신 제외
@@ -80,7 +90,7 @@ public class HubRouteService {
      * 지점 허브에 대한 경로 생성
      */
     private Set<HubRoute> buildForBranch(BuildRouteCommand command) {
-        Hub branchHub = getHub(command.hubId());
+        Hub branchHub = getHubIncludingCreating(command.hubId());
         Hub centerHub = getHub(command.centerHubId());
         
         Set<HubRoute> routes = hubRouteDomainService.buildRoutesForNewBranchHub(
@@ -97,10 +107,14 @@ public class HubRouteService {
      * 경로 가중치(시간,거리) 계산
      */
     private RouteWeight calculateRouteWeight(Hub from, Hub to) {
-        RouteWeightRes response = routeWeightApi.getRouteInfo(
-            from.getCoordinate(), 
-            to.getCoordinate()
+        RouteWeightQuery query = new RouteWeightQuery(
+                from.getHubId(),
+                from.getCoordinate(),
+                to.getCoordinate(),
+                resolvePurpose(from, to),
+                ProviderHint.ANY
         );
+        RouteWeightResult response = routeWeightApi.getRouteInfo(query);
         return RouteWeight.of(response.distanceKm(), response.durationMinutes());
     }
 
@@ -109,12 +123,32 @@ public class HubRouteService {
             .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
     }
 
+    private Hub getHubIncludingCreating(UUID hubId) {
+        return hubRepository.findByIdIncludingCreating(hubId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
+    }
+
+    private Hub getHubIncludingDeleted(UUID hubId) {
+        return hubRepository.findByIdIncludingDeleted(hubId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
+    }
+
+    private RoutePurpose resolvePurpose(Hub from, Hub to) {
+        if (from.isCenterHub() && to.isCenterHub()) {
+            return RoutePurpose.CENTER_TO_CENTER;
+        }
+        if (from.isBranchHub() && to.isCenterHub()) {
+            return RoutePurpose.BRANCH_TO_CENTER;
+        }
+        return RoutePurpose.BRANCH_TO_BRANCH;
+    }
+
     /**
      * 허브 삭제 시 해당 허브와 연결된 모든 경로 소프트 삭제
      */
     @Transactional
     public void deleteRoutesForHub(UUID hubId, Long deletedBy) {
-        Hub hub = getHub(hubId);
+        Hub hub = getHubIncludingDeleted(hubId);
         
         // 해당 Hub가 시작점이거나 끝점인 모든 경로 조회
         List<HubRoute> routes = hubRouteRepository.findByStartHubOrEndHub(hub, hub);

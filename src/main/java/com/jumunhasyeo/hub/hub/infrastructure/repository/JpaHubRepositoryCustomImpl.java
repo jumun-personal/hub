@@ -2,6 +2,7 @@ package com.jumunhasyeo.hub.hub.infrastructure.repository;
 
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
 import com.jumunhasyeo.hub.hub.domain.entity.QHub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -44,6 +45,7 @@ public class JpaHubRepositoryCustomImpl implements JpaHubRepositoryCustom {
                 .from(hub)
                 .where(
                         isNotDeleted(),
+                        isActive(),
                         nameContains(condition.getName()),
                         streetContains(condition.getStreet())
                 )
@@ -58,6 +60,7 @@ public class JpaHubRepositoryCustomImpl implements JpaHubRepositoryCustom {
                 .from(hub)
                 .where(
                         isNotDeleted(),
+                        isActive(),
                         nameContains(condition.getName()),
                         streetContains(condition.getStreet())
                 )
@@ -71,6 +74,11 @@ public class JpaHubRepositoryCustomImpl implements JpaHubRepositoryCustom {
     private BooleanExpression isNotDeleted() {
         QHub hub = QHub.hub;
         return hub.deletedAt.isNull();
+    }
+
+    private BooleanExpression isActive() {
+        QHub hub = QHub.hub;
+        return hub.status.isNull().or(hub.status.eq(HubStatus.ACTIVE));
     }
 
     private BooleanExpression nameContains(String name) {

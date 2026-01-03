@@ -3,8 +3,10 @@ package com.jumunhasyeo.hub.hubRoute.infrastructure.external;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightRes;
-import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightApiService;
+import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
+import com.jumunhasyeo.hub.hubRoute.application.dto.request.RouteWeightQuery;
+import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightStrategy;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.external.client.map.KakaoMobilityClient;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.response.KakaoRouteResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +19,7 @@ import java.math.BigDecimal;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class KakaoWeightRouteApiServiceImpl implements RouteWeightApiService {
+public class KakaoWeightRouteApiServiceImpl implements RouteWeightStrategy {
 
     private final KakaoMobilityClient kakaoMobilityClient;
 
@@ -27,11 +29,13 @@ public class KakaoWeightRouteApiServiceImpl implements RouteWeightApiService {
     /**
      * 두 좌표 간의 실제 경로 정보를 조회
      */
-    public RouteWeightRes getRouteInfo(Coordinate start, Coordinate end){
+    public RouteWeightResult getWeight(RouteWeightQuery query){
         try {
             Thread.sleep(300); // TODO 카카오 API 초당  제한 대응
 
             // Kakao API 형식: "경도,위도" (longitude,latitude)
+            Coordinate start = query.start();
+            Coordinate end = query.end();
             String origin = String.format("%f,%f", start.getLongitude(), start.getLatitude());
             String destination = String.format("%f,%f", end.getLongitude(), end.getLatitude());
 
@@ -60,13 +64,18 @@ public class KakaoWeightRouteApiServiceImpl implements RouteWeightApiService {
 
             BigDecimal distanceKm = response.getDistanceKm();
             Integer durationMinutes = response.getDurationMinutes();
-            return new RouteWeightRes(distanceKm, durationMinutes);
+            return new RouteWeightResult(distanceKm, durationMinutes, MapProvider.KAKAO, false);
 
         } catch (Exception e) {
             e.printStackTrace();
             log.error("Failed to get route from Kakao API, {}", e.toString());
             throw new BusinessException(ErrorCode.MAP_API_EXCEPTION);
         }
+    }
+
+    @Override
+    public MapProvider provider() {
+        return MapProvider.KAKAO;
     }
 
 }

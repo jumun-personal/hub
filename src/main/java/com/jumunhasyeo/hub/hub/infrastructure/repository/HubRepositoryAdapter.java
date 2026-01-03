@@ -1,6 +1,7 @@
 package com.jumunhasyeo.hub.hub.infrastructure.repository;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,26 +23,36 @@ public class HubRepositoryAdapter implements HubRepository {
 
     @Override
     public Optional<Hub> findById(UUID id) {
-        return jpaHubRepository.findById(id);
+        return jpaHubRepository.findById(id, HubStatus.ACTIVE);
+    }
+
+    @Override
+    public Optional<Hub> findByIdIncludingCreating(UUID id) {
+        return jpaHubRepository.findByIdIncludingCreating(id);
+    }
+
+    @Override
+    public Optional<Hub> findByIdIncludingDeleted(UUID id) {
+        return jpaHubRepository.findByIdIncludingDeleted(id);
     }
 
     @Override
     public Boolean existById(UUID hubId) {
-        return jpaHubRepository.existsById(hubId);
+        return jpaHubRepository.existsById(hubId, HubStatus.ACTIVE);
     }
 
     @Override
     public long count() {
-        return jpaHubRepository.count();
+        return jpaHubRepository.count(HubStatus.ACTIVE);
     }
 
     @Override
     public List<Hub> findAllByHubType(HubType type) {
-        return jpaHubRepository.findAllByHubType(type);
+        return jpaHubRepository.findAllByHubType(type, HubStatus.ACTIVE);
     }
 
     @Override
     public List<Hub> findAll() {
-        return jpaHubRepository.findAll();
+        return jpaHubRepository.findAll(HubStatus.ACTIVE);
     }
 }

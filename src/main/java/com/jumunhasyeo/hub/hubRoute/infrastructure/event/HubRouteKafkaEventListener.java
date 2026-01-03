@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_CREATED_EVENT;
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_DELETED_EVENT;
+import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_ROUTE_BUILD_COMPLETED_EVENT;
+import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_ROUTE_BUILD_FAILED_EVENT;
 
 @Slf4j
 @Component
@@ -48,6 +50,9 @@ public class HubRouteKafkaEventListener {
             HubDeletedEvent hubDeletedEvent = objectMapper.readValue(payload, HubDeletedEvent.class);
             hubRouteEventHandler.hubDeleted(hubDeletedEvent);
 
+        } else if (simpleClassName.equals(HUB_ROUTE_BUILD_COMPLETED_EVENT.getEventName())
+                || simpleClassName.equals(HUB_ROUTE_BUILD_FAILED_EVENT.getEventName())) {
+            log.debug("Skip hub-route build result event: {}", simpleClassName);
         } else {
             log.info("Unhandled event type: {}", simpleClassName);
             log.info("Unhandled event payload: {}", payload);

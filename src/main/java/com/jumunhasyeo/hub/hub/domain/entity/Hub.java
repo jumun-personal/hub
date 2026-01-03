@@ -47,6 +47,11 @@ public class Hub extends BaseEntity {
     @Embedded
     private Address address;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    @Builder.Default
+    private HubStatus status = HubStatus.CREATING;
+
     /**
      * this Hub의 CENTER
      */
@@ -65,6 +70,7 @@ public class Hub extends BaseEntity {
         this.name = name;
         this.address = address;
         this.hubType = hubType;
+        this.status = HubStatus.CREATING;
         this.centerHubRelations = new HashSet<>();
         this.branchHubRelations = new HashSet<>();
     }
@@ -82,6 +88,15 @@ public class Hub extends BaseEntity {
         validate(name, address);
         this.name = name;
         this.address = address;
+    }
+
+    public void activate() {
+        this.status = HubStatus.ACTIVE;
+    }
+
+    public void markFailed(Long userId) {
+        this.status = HubStatus.FAILED;
+        markDeleted(userId);
     }
 
     public void delete(Long userId) {
@@ -128,6 +143,10 @@ public class Hub extends BaseEntity {
 
     public boolean isBranchHub() {
         return BRANCH.equals(hubType);
+    }
+
+    public boolean isActive() {
+        return HubStatus.ACTIVE.equals(status);
     }
 
     public Set<Hub> getBranchHubs(){

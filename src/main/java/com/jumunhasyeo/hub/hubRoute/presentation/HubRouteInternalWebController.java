@@ -2,7 +2,7 @@ package com.jumunhasyeo.hub.hubRoute.presentation;
 
 import com.jumunhasyeo.common.ApiRes;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
-import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
+import com.jumunhasyeo.hub.hubRoute.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.presentation.docs.ApiDocGetAllHubRoutes;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

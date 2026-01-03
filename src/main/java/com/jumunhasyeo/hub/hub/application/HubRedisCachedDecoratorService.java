@@ -32,11 +32,10 @@ public class HubRedisCachedDecoratorService implements HubService {
      * Hub 생성 후 캐시에 저장
      */
     @Transactional
-    @CachePut(value = CACHE_NAME, key = "#result.id()", condition = "#result != null")
     @CacheEvict(value = CACHE_NAME, key = "'all'", beforeInvocation = false)
     public HubRes create(CreateHubCommand command) {
         HubRes created = hubService.create(command);
-        log.info(" Hub Created & Cached - hubId: {}", created.id());
+        log.info(" Hub Created - hubId: {}", created.id());
         return created;
     }
 

@@ -88,6 +88,16 @@ kakao:
   mobility:
     api-key: ${KAKAO_MOBILITY_API_KEY}
 
+naver:
+  maps:
+    base-url: ${NAVER_MAPS_BASE_URL:https://naveropenapi.apigw.ntruss.com}
+    api-key-id: ${NAVER_MAPS_API_KEY_ID}
+    api-key: ${NAVER_MAPS_API_KEY}
+
+hub:
+  compensation:
+    deleted-by: ${HUB_COMPENSATION_DELETED_BY:0}
+
 eureka:
   client:
     service-url:
@@ -129,6 +139,22 @@ resilience4j:
           - java.net.SocketTimeoutException
           - java.net.ConnectException
           - java.io.IOException
+      kakaoRoute:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      naverRoute:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
   retry:
     instances:
       redisIdempotency:
@@ -138,6 +164,16 @@ resilience4j:
         exponentialBackoffMultiplier: 2  # 2배씩 증가 (500ms → 1s → 2s)
         retryExceptions: # 이 예외들만 재시도
           - org.springframework.data.redis.RedisConnectionFailureException
+      kakaoRoute:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+      naverRoute:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
           - java.net.ConnectException
           - java.io.IOException
 

@@ -9,4 +9,5 @@ public interface HubRelationRepository {
     boolean existsByParentHubAndChildHub(Hub parent, Hub child);
     HubRelation save(HubRelation relation);
     List<HubRelation> findByParentHub(Hub parent);
+    void deleteByHubId(java.util.UUID hubId);
 }
