@@ -5,7 +5,6 @@ import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
-import com.jumunhasyeo.hub.hubRoute.infrastructure.event.KafkaHubRouteEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -18,7 +17,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class HubRouteSpringEventListener {
 
-    private final KafkaHubRouteEventPublisher kafkaHubRouteEventPublisher;
     private final OutboxService outboxService;
 
     /**
@@ -61,14 +59,7 @@ public class HubRouteSpringEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void asyncHandleHubRouteCreated(HubRouteCreatedEvent event) {
         log.info("async HubRouteCreatedEvent received size: {} ", event.getRouteId());
-        var result = kafkaHubRouteEventPublisher.publish(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubRouteCreatedEventList to Kafka size: {}", event.getRouteId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 
     /**
@@ -80,14 +71,7 @@ public class HubRouteSpringEventListener {
     public void asyncHandleHubRouteDeleted(HubRouteDeletedEvent event) {
         log.info("async HubRouteDeletedEvent received size: {} ", event.getRouteId());
 
-        var result = kafkaHubRouteEventPublisher.publish(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubRouteCreatedEventList to Kafka size: {}", event.getRouteId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
 
     }
 
@@ -95,27 +79,13 @@ public class HubRouteSpringEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void asyncHandleHubRouteBuildCompleted(HubRouteBuildCompletedEvent event) {
         log.info("async HubRouteBuildCompletedEvent received hubId: {} ", event.getHubId());
-        var result = kafkaHubRouteEventPublisher.publish(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubRouteBuildCompletedEvent for hubId: {}", event.getHubId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 
     @Async("eventExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void asyncHandleHubRouteBuildFailed(HubRouteBuildFailedEvent event) {
         log.info("async HubRouteBuildFailedEvent received hubId: {} ", event.getHubId());
-        var result = kafkaHubRouteEventPublisher.publish(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubRouteBuildFailedEvent for hubId: {}", event.getHubId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 }

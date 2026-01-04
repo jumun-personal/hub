@@ -5,7 +5,6 @@ import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
-import com.jumunhasyeo.hub.hub.infrastructure.event.KafkaHubEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -18,7 +17,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class HubEventListener {
 
-    private final KafkaHubEventPublisher kafkaHubEventPublisher;
     private final OutboxService outboxService;
 
     /**
@@ -82,14 +80,7 @@ public class HubEventListener {
         log.info("HubUpdatedEvent async event received: (ID: {})",
                 event.getHubId());
 
-        var result = kafkaHubEventPublisher.publishEvent(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubCreatedEvent to Kafka for Hub ID: {}", event.getHubId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 
     /**
@@ -103,14 +94,7 @@ public class HubEventListener {
                 event.getName(),
                 event.getHubId());
 
-        var result = kafkaHubEventPublisher.publishEvent(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubCreatedEvent to Kafka for Hub ID: {}", event.getHubId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 
     /**
@@ -124,14 +108,7 @@ public class HubEventListener {
                 event.getName(),
                 event.getHubId());
 
-        var result = kafkaHubEventPublisher.publishEvent(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubDeletedEvent to Kafka for Hub ID: {}", event.getHubId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 
     /**
@@ -145,13 +122,6 @@ public class HubEventListener {
                 event.getName(),
                 event.getHubId());
 
-        var result = kafkaHubEventPublisher.publishEvent(event);
-        result.whenComplete((sendResult, exception) -> {
-            if (exception != null) {
-                log.error("Failed to publish HubNameUpdatedEvent to Kafka for Hub ID: {}", event.getHubId(), exception);
-            } else {
-                outboxService.markAsProcessed(event.getEventKey());
-            }
-        });
+        outboxService.publishAfterCommit(event.getEventKey());
     }
 }

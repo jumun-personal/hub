@@ -8,6 +8,8 @@ import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
+import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
+import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,8 @@ import java.util.List;
 
 import static com.jumunhasyeo.hub.hubRoute.domain.event.PublishEventRegistry.HUB_ROUTE_CREATED_EVENT;
 import static com.jumunhasyeo.hub.hubRoute.domain.event.PublishEventRegistry.HUB_ROUTE_DELETED_EVENT;
+import static com.jumunhasyeo.hub.hubRoute.domain.event.PublishEventRegistry.HUB_ROUTE_BUILD_COMPLETED_EVENT;
+import static com.jumunhasyeo.hub.hubRoute.domain.event.PublishEventRegistry.HUB_ROUTE_BUILD_FAILED_EVENT;
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_CREATED_EVENT;
 
 @Slf4j
@@ -86,11 +90,37 @@ public class OutboxService {
     @Transactional
     public void save(HubUpdatedEvent event) {
         try {
-            OutboxEvent outboxEvent = OutboxEvent.of(HUB_ROUTE_DELETED_EVENT.getEventName(), objectMapper.writeValueAsString(event), event.getEventKey(), hubTopic);
+            OutboxEvent outboxEvent = OutboxEvent.of("HubUpdatedEvent", objectMapper.writeValueAsString(event), event.getEventKey(), hubTopic);
             outboxRepository.save(outboxEvent);
         } catch (JsonProcessingException e) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to serialize event payload");
         }
+    }
+
+    @Transactional
+    public void save(HubRouteBuildCompletedEvent event) {
+        try {
+            OutboxEvent outboxEvent = OutboxEvent.of(HUB_ROUTE_BUILD_COMPLETED_EVENT.getEventName(), objectMapper.writeValueAsString(event), event.getEventKey(), hubTopic);
+            outboxRepository.save(outboxEvent);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to serialize event payload");
+        }
+    }
+
+    @Transactional
+    public void save(HubRouteBuildFailedEvent event) {
+        try {
+            OutboxEvent outboxEvent = OutboxEvent.of(HUB_ROUTE_BUILD_FAILED_EVENT.getEventName(), objectMapper.writeValueAsString(event), event.getEventKey(), hubTopic);
+            outboxRepository.save(outboxEvent);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to serialize event payload");
+        }
+    }
+
+    @Transactional
+    public void publishAfterCommit(String eventKey) {
+        OutboxEvent outboxEvent = outboxRepository.findByEventKey(eventKey);
+        outboxProcess(outboxEvent);
     }
 
     @Transactional
@@ -127,5 +157,9 @@ public class OutboxService {
 
     public List<OutboxEvent> findTop100ByStatusOrderByIdAsc(OutboxStatus outboxStatus) {
         return outboxRepository.findTop100ByStatusOrderByIdAsc(outboxStatus);
+    }
+
+    public List<OutboxEvent> findTop100ByStatusAndCreatedAtBeforeOrderByIdAsc(OutboxStatus outboxStatus, LocalDateTime createdAt) {
+        return outboxRepository.findTop100ByStatusAndCreatedAtBeforeOrderByIdAsc(outboxStatus, createdAt);
     }
 }

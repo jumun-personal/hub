@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface JpaOutboxRepository extends JpaRepository<OutboxEvent, UUID> {
     // PENDING 상태인 이벤트 상위 100개 조회
     List<OutboxEvent> findTop100ByStatusOrderByIdAsc(OutboxStatus status);
+    List<OutboxEvent> findTop100ByStatusAndCreatedAtBeforeOrderByIdAsc(OutboxStatus status, LocalDateTime createdAt);
 
     @Modifying
     @Transactional

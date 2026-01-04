@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static com.jumunhasyeo.common.outbox.OutboxStatus.FAILED;
 import static com.jumunhasyeo.common.outbox.OutboxStatus.PENDING;
 
 @Component
@@ -25,9 +26,14 @@ public class OutboxPollingScheduler {
     @SchedulerLock(name = "outboxPolling", lockAtLeastFor = "5s")
     @Scheduled(fixedDelay = 5000) // 2초마다 Polling
     public void pollOutbox() {
-        // 처리되지 않은 이벤트 조회
-        List<OutboxEvent> events = outboxService.findTop100ByStatusOrderByIdAsc(PENDING);
-        for (OutboxEvent event : events) {
+        List<OutboxEvent> failedEvents = outboxService.findTop100ByStatusOrderByIdAsc(FAILED);
+        for (OutboxEvent event : failedEvents) {
+            outboxService.outboxProcess(event);
+        }
+
+        LocalDateTime pendingCutoff = LocalDateTime.now().minusMinutes(5);
+        List<OutboxEvent> pendingEvents = outboxService.findTop100ByStatusAndCreatedAtBeforeOrderByIdAsc(PENDING, pendingCutoff);
+        for (OutboxEvent event : pendingEvents) {
             outboxService.outboxProcess(event);
         }
     }
