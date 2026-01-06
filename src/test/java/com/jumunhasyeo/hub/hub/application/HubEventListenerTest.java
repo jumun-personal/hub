@@ -9,28 +9,19 @@ import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.hub.hub.infrastructure.event.KafkaHubEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.support.SendResult;
 
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 public class HubEventListenerTest {
-
-    @Mock
-    private KafkaHubEventPublisher kafkaHubEventPublisher;
 
     @Mock
     private OutboxService outboxService;
@@ -92,135 +83,103 @@ public class HubEventListenerTest {
     }
 
     @Test
-    @DisplayName("HubCreatedEvent를 Kafka로 발행하고 성공 시 Outbox를 완료 처리한다.")
+    @DisplayName("HubCreatedEvent를 커밋 후 Outbox 발행 처리한다.")
     void asyncHandleHubCreated_success() {
         //given
         Hub hub = createHub();
         HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         //when
         hubEventListener.asyncHandleHubCreated(event);
 
         //then
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should().markAsProcessed(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubCreatedEvent Kafka 발행 실패 시 Outbox를 완료 처리하지 않는다.")
+    @DisplayName("HubCreatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubCreated_WhenKafkaFails_doesNotMarkAsProcessed() {
         //given
         Hub hub = createHub();
         HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.failedFuture(
-                new RuntimeException("Kafka error")
-        );
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         //when
         hubEventListener.asyncHandleHubCreated(event);
 
         //then
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should(never()).markAsProcessed(any());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubDeletedEvent를 Kafka로 발행하고 성공 시 Outbox를 완료 처리한다.")
+    @DisplayName("HubDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubDeleted_success() {
         //given
         Hub hub = createHub();
         HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         //when
         hubEventListener.asyncHandleHubDeleted(event);
 
         //then
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should().markAsProcessed(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubNameUpdatedEvent를 Kafka로 발행하고 성공 시 Outbox를 완료 처리한다.")
+    @DisplayName("HubNameUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleNameUpdated_success() {
         //given
         Hub hub = createHub();
         HubNameUpdatedEvent event = HubNameUpdatedEvent.of(hub);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         //when
         hubEventListener.asyncHandleNameUpdated(event);
 
         //then
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should().markAsProcessed(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubUpdatedEvent를 Kafka로 발행하고 성공 시 Outbox를 완료 처리한다.")
+    @DisplayName("HubUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubUpdated_success() {
         Hub hub = createHub();
         HubUpdatedEvent event = HubUpdatedEvent.of(hub);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         hubEventListener.asyncHandleHubUpdated(event);
 
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should().markAsProcessed(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubUpdatedEvent Kafka 발행 실패 시 Outbox를 완료 처리하지 않는다.")
+    @DisplayName("HubUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubUpdated_fail() {
         Hub hub = createHub();
         HubUpdatedEvent event = HubUpdatedEvent.of(hub);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.failedFuture(
-                new RuntimeException("Kafka error")
-        );
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         hubEventListener.asyncHandleHubUpdated(event);
 
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should(never()).markAsProcessed(any());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubDeletedEvent Kafka 발행 실패 시 Outbox를 완료 처리하지 않는다.")
+    @DisplayName("HubDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubDeleted_fail() {
         Hub hub = createHub();
         HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.failedFuture(
-                new RuntimeException("Kafka error")
-        );
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         hubEventListener.asyncHandleHubDeleted(event);
 
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should(never()).markAsProcessed(any());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubNameUpdatedEvent Kafka 발행 실패 시 Outbox를 완료 처리하지 않는다.")
+    @DisplayName("HubNameUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleNameUpdated_fail() {
         Hub hub = createHub();
         HubNameUpdatedEvent event = HubNameUpdatedEvent.of(hub);
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.failedFuture(
-                new RuntimeException("Kafka error")
-        );
-        given(kafkaHubEventPublisher.publishEvent(event)).willReturn(future);
 
         hubEventListener.asyncHandleNameUpdated(event);
 
-        then(kafkaHubEventPublisher).should().publishEvent(event);
-        then(outboxService).should(never()).markAsProcessed(any());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     private static Hub createHub() {

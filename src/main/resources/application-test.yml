@@ -10,6 +10,10 @@ spring:
     banner-mode: off
     log-startup-info: false
 
+  task:
+    scheduling:
+      enabled: false
+
   data:
     redis:
       cache:
@@ -57,6 +61,8 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9092
+    listener:
+      auto-startup: false
     topics:
       hub: hub-test
       order: order-test
@@ -97,9 +103,24 @@ kakao:
   mobility:
     api-key: dummy-kakao-api-key-for-test
 
+naver:
+  maps:
+    base-url: https://naveropenapi.apigw.ntruss.com
+    api-key-id: dummy-naver-api-key-id-for-test
+    api-key: dummy-naver-api-key-for-test
+
+hub:
+  compensation:
+    deleted-by: 0
+
 # Resilience4j 비활성화
 resilience4j:
   circuitbreaker:
+    instances:
+      kakaoRoute:
+        baseConfig: default
+      naverRoute:
+        baseConfig: default
     configs:
       default:
         registerHealthIndicator: false
@@ -107,19 +128,14 @@ resilience4j:
         minimumNumberOfCalls: 10
         failureRateThreshold: 100  # 항상 닫힌 상태 유지
   retry:
+    instances:
+      kakaoRoute:
+        baseConfig: default
+      naverRoute:
+        baseConfig: default
     configs:
       default:
         maxAttempts: 1  # 재시도 비활성화
-
-# 로깅 설정 (logback-spring.xml이 우선하지만 명시)
-logging:
-  level:
-    root: WARN
-    com.sparta: INFO  # 본인 패키지명으로 변경
-    org.hibernate: ERROR
-    org.springframework: WARN
-    org.apache.kafka: ERROR
-    com.github.loki4j: OFF  # Loki 로그 완전 차단
 
 # 모니터링 완전 비활성화
 management:

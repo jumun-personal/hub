@@ -166,6 +166,7 @@ class HubRedisCachedDecoratorServiceIntegrationTest extends AbstractIntegrationT
                 name,
                 Address.of("서울시 송파구", Coordinate.of(37.5, 127.0))
         );
+        hub.activate();
         return hubRepository.save(hub);
     }
 

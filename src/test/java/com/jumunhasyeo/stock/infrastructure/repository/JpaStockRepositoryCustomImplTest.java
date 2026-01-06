@@ -2,6 +2,7 @@ package com.jumunhasyeo.stock.infrastructure.repository;
 
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepository;
@@ -177,6 +178,7 @@ class JpaStockRepositoryCustomImplTest extends AbstractJpaRepositoryTest {
     private static Hub createHub(String name, String street, Double lat, Double lon) {
         return Hub.builder()
                 .name(name)
+                .status(HubStatus.ACTIVE)
                 .address(Address.of(street, Coordinate.of(lat, lon)))
                 .build();
     }

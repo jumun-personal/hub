@@ -1,6 +1,7 @@
 package com.jumunhasyeo.hubRoute.infrastructure.repository;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
@@ -124,6 +125,7 @@ class JpaHubRouteRepositoryTest extends AbstractJpaRepositoryTest {
         return Hub.builder()
                 .name(name)
                 .hubType(HubType.CENTER)
+                .status(HubStatus.ACTIVE)
                 .address(Address.of("주소", Coordinate.of(37.5, 127.0)))
                 .build();
     }

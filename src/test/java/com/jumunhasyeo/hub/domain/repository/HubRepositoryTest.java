@@ -1,6 +1,7 @@
 package com.jumunhasyeo.hub.domain.repository;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -221,6 +222,7 @@ class HubRepositoryTest extends AbstractJpaRepositoryTest {
     private static Hub createHub() {
         return Hub.builder()
                 .name("송파 허브")
+                .status(HubStatus.ACTIVE)
                 .address(Address.of("street", Coordinate.of(12.6, 12.6)))
                 .build();
     }
@@ -229,6 +231,7 @@ class HubRepositoryTest extends AbstractJpaRepositoryTest {
         return Hub.builder()
                 .name(name)
                 .hubType(hubType)
+                .status(HubStatus.ACTIVE)
                 .address(Address.of("주소", Coordinate.of(37.5, 127.0)))
                 .build();
     }

@@ -9,13 +9,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @Slf4j
 public class NaverMapFeignClientConfig {
-    @Bean
-    Logger.Level feignLoggerLevel() {
+    @Bean(name = "naverFeignLoggerLevel")
+    Logger.Level naverFeignLoggerLevel() {
         return Logger.Level.FULL;
     }
 
-    @Bean
-    ErrorDecoder errorDecoder() {
+    @Bean(name = "naverErrorDecoder")
+    ErrorDecoder naverErrorDecoder() {
         return (methodKey, response) -> {
             log.error("Naver Map API Error: {} - {}", response.status(), response.reason());
             switch (response.status()) {

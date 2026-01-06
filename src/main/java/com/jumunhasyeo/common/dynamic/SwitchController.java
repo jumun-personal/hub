@@ -13,7 +13,7 @@ import java.util.Set;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/dynamic") //TODO: FIX 테스트를 위해 internal 제거
+@RequestMapping("/api/v1/dynamic")
 @RequiredArgsConstructor
 public class SwitchController {
     

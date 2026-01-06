@@ -124,16 +124,6 @@ dependencyManagement {
 tasks.named('test') {
     useJUnitPlatform()
     environment 'SPRING_PROFILES_ACTIVE', 'test'
-    // Keep JVM reuse for stable startup cost.
-    forkEvery = 0
-
-    // Disable class-level parallel forks to avoid resource contention/flaky integration tests.
-    maxParallelForks = 1
-
-    // Keep JUnit method-level parallel off to avoid data isolation flakiness.
-    systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
-    // Increase Spring context cache headroom for mixed test slices.
-    systemProperty 'spring.test.context.cache.maxSize', '64'
 }
 
 // Q클래스 생성 경로 설정

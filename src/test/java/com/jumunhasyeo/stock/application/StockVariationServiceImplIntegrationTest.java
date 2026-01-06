@@ -1,6 +1,7 @@
 package com.jumunhasyeo.stock.application;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
@@ -106,6 +107,7 @@ public class StockVariationServiceImplIntegrationTest extends AbstractIntegratio
     private  Hub createHub() {
         return Hub.builder()
                 .name("송파 허브")
+                .status(HubStatus.ACTIVE)
                 .address(Address.of("street", Coordinate.of(12.6, 12.6)))
                 .build();
     }

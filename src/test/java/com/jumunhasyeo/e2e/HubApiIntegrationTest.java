@@ -1,6 +1,7 @@
 package com.jumunhasyeo.e2e;
 
 import com.jumunhasyeo.common.exception.ErrorCode;
+import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.CreateHubReq;
 import com.jumunhasyeo.testsupport.AbstractHttpIntegrationTest;
@@ -8,7 +9,10 @@ import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
+
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
@@ -18,6 +22,9 @@ public class HubApiIntegrationTest extends AbstractHttpIntegrationTest {
 
     @LocalServerPort
     private int port;
+
+    @Autowired
+    private HubCreationSagaService hubCreationSagaService;
 
     @Override
     protected void beforeEachAfterTruncate() {
@@ -39,6 +46,8 @@ public class HubApiIntegrationTest extends AbstractHttpIntegrationTest {
                 .then()
                 .statusCode(201)
                 .extract().path("data.id");
+
+        hubCreationSagaService.complete(UUID.fromString(hubId));
 
         // then: 생성된 허브 조회
         given()

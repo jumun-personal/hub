@@ -9,13 +9,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @Slf4j
 public class MapApiFeignClientConfig {
-    @Bean
-    Logger.Level feignLoggerLevel() {
+    @Bean(name = "kakaoFeignLoggerLevel")
+    Logger.Level kakaoFeignLoggerLevel() {
         return Logger.Level.FULL;  // TODO 개발 시: FULL, 운영 시: BASIC
     }
 
-    @Bean
-    ErrorDecoder errorDecoder() {
+    @Bean(name = "kakaoErrorDecoder")
+    ErrorDecoder kakaoErrorDecoder() {
         return (methodKey, response) -> {
             log.error("Kakao Mobility API Error: {} - {}",
                     response.status(), response.reason());

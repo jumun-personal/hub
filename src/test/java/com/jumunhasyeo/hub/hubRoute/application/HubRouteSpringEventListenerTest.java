@@ -9,31 +9,22 @@ import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
-import com.jumunhasyeo.hub.hubRoute.infrastructure.event.KafkaHubRouteEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.support.SendResult;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 public class HubRouteSpringEventListenerTest {
-
-    @Mock
-    private KafkaHubRouteEventPublisher kafkaHubRouteEventPublisher;
 
     @Mock
     private OutboxService outboxService;
@@ -68,71 +59,55 @@ public class HubRouteSpringEventListenerTest {
     }
 
     @Test
-    @DisplayName("HubRouteCreatedEvent를 Kafka로 발행하고 성공 시 Outbox를 완료 처리한다.")
+    @DisplayName("HubRouteCreatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubRouteCreated_success() {
         //given
         HubRouteCreatedEvent event = createHubRouteCreatedEvent();
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
-        given(kafkaHubRouteEventPublisher.publish(event)).willReturn(future);
 
         //when
         hubRouteSpringEventListener.asyncHandleHubRouteCreated(event);
 
         //then
-        then(kafkaHubRouteEventPublisher).should().publish(event);
-        then(outboxService).should(times(1)).markAsProcessed(any());
+        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubRouteCreatedEvent Kafka 발행 실패 시 Outbox를 완료 처리하지 않는다.")
+    @DisplayName("HubRouteCreatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubRouteCreated_WhenKafkaFails_doesNotMarkAsProcessed() {
         //given
         HubRouteCreatedEvent event = createHubRouteCreatedEvent();
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.failedFuture(
-                new RuntimeException("Kafka error")
-        );
-        given(kafkaHubRouteEventPublisher.publish(event)).willReturn(future);
 
         //when
         hubRouteSpringEventListener.asyncHandleHubRouteCreated(event);
 
         //then
-        then(kafkaHubRouteEventPublisher).should().publish(event);
-        then(outboxService).should(never()).markAsProcessed(any());
+        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubRouteDeletedEvent 리스트를 Kafka로 발행하고 성공 시 Outbox를 완료 처리한다.")
+    @DisplayName("HubRouteDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubRouteDeleted_success() {
         //given
         HubRouteDeletedEvent event = createHubRouteDeletedEvent();
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
-        given(kafkaHubRouteEventPublisher.publish(event)).willReturn(future);
 
         //when
         hubRouteSpringEventListener.asyncHandleHubRouteDeleted(event);
 
         //then
-        then(kafkaHubRouteEventPublisher).should().publish(event);
-        then(outboxService).should(times(1)).markAsProcessed(any());
+        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubRouteDeletedEvent Kafka 발행 실패 시 Outbox를 완료 처리하지 않는다.")
+    @DisplayName("HubRouteDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
     void asyncHandleHubRouteDeleted_WhenKafkaFails_doesNotMarkAsProcessed() {
         //given
         HubRouteDeletedEvent event = createHubRouteDeletedEvent();
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.failedFuture(
-                new RuntimeException("Kafka error")
-        );
-        given(kafkaHubRouteEventPublisher.publish(event)).willReturn(future);
 
         //when
         hubRouteSpringEventListener.asyncHandleHubRouteDeleted(event);
 
         //then
-        then(kafkaHubRouteEventPublisher).should().publish(event);
-        then(outboxService).should(never()).markAsProcessed(any());
+        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
     }
 
     private static HubRouteCreatedEvent createHubRouteCreatedEvent() {
