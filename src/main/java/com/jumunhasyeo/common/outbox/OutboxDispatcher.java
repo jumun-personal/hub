@@ -1,5 +1,7 @@
 package com.jumunhasyeo.common.outbox;
 
+import com.jumunhasyeo.common.exception.BusinessException;
+import com.jumunhasyeo.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,12 +25,15 @@ public class OutboxDispatcher {
                 record.headers().add("source", "hub-service".getBytes());
 
                 kafkaTemplate.send(record).get(); // 동기 대기
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Kafka 이벤트 발행에 실패했습니다.", e);
+            } catch (ExecutionException e) {
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Kafka 이벤트 발행에 실패했습니다.", e);
             }
         }
         else{
-            throw new RuntimeException( "Unknown topic: " + event.getTopic());
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 토픽입니다. topic=" + event.getTopic());
         }
     }
 }

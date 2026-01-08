@@ -1,7 +1,10 @@
 package com.jumunhasyeo.common.inbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jumunhasyeo.common.exception.BusinessException;
+import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.infrastructure.event.OrderCancelEvent;
+import com.jumunhasyeo.stock.infrastructure.event.OrderRolledBackEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +22,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.*;
+import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORDER_CANCEL_EVENT;
+import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORDER_ROLLED_BACK_EVENT;
 
 @ExtendWith(MockitoExtension.class)
 public class InboxServiceTest {
@@ -52,6 +57,29 @@ public class InboxServiceTest {
 
         InboxEvent savedEvent = captor.getValue();
         assertThat(savedEvent.getEventKey()).isEqualTo(event.getKey());
+        assertThat(savedEvent.getEventName()).isEqualTo(ORDER_CANCEL_EVENT.getEventName());
+        assertThat(savedEvent.getPayload()).isEqualTo(expectedJson);
+        assertThat(savedEvent.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("OrderRolledBackEvent를 저장할 수 있다.")
+    void save_OrderRolledBackEvent_success() throws Exception {
+        //given
+        OrderRolledBackEvent event = new OrderRolledBackEvent(UUID.randomUUID(), "ROLLED_BACK", LocalDateTime.now());
+        String expectedJson = "{\"key\":\"test-key\"}";
+        given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
+
+        //when
+        inboxService.save(event);
+
+        //then
+        ArgumentCaptor<InboxEvent> captor = ArgumentCaptor.forClass(InboxEvent.class);
+        then(inboxRepository).should().save(captor.capture());
+
+        InboxEvent savedEvent = captor.getValue();
+        assertThat(savedEvent.getEventKey()).isEqualTo(event.getKey());
+        assertThat(savedEvent.getEventName()).isEqualTo(ORDER_ROLLED_BACK_EVENT.getEventName());
         assertThat(savedEvent.getPayload()).isEqualTo(expectedJson);
         assertThat(savedEvent.getStatus()).isEqualTo(InboxStatus.RECEIVED);
     }
@@ -120,9 +148,27 @@ public class InboxServiceTest {
         inboxService.inboxProcess(event);
 
         //then
-        then(inboxRepository).should().save(event);
+        then(inboxRepository).should(times(2)).save(event);
         assertThat(event.getRetryCount()).isEqualTo(1);
         assertThat(event.getErrorMessage()).isEqualTo("Dispatch error");
+        assertThat(event.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("재시도 불가능한 BusinessException 발생 시 FAILED 처리된다.")
+    void inboxProcess_WhenNonRetryableBusinessException_marksFailed() {
+        //given
+        InboxEvent event = createInboxEvent();
+        doThrow(new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 이벤트"))
+                .when(inboxDispatcher).dispatch(event);
+
+        //when
+        inboxService.inboxProcess(event);
+
+        //then
+        then(inboxRepository).should(times(2)).save(event);
+        assertThat(event.getStatus()).isEqualTo(InboxStatus.FAILED);
+        assertThat(event.getErrorMessage()).contains("지원하지 않는 이벤트");
     }
 
     private static InboxEvent createInboxEvent() {

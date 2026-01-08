@@ -2,6 +2,8 @@ package com.jumunhasyeo.hub.hub.infrastructure.event;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jumunhasyeo.common.exception.BusinessException;
+import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.event.HubDomainEvent;
 import com.jumunhasyeo.hub.hub.domain.event.PublishEventRegistry;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +36,7 @@ public class KafkaHubEventPublisher {
             record.headers().add("source", "hub-service".getBytes());
             return template.send(record);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "허브 이벤트 직렬화에 실패했습니다.", e);
         }
     }
 }

@@ -21,7 +21,8 @@ public class InboxEventTest {
         InboxEvent event = InboxEvent.from(eventKey, eventName, payload);
 
         //then
-        assertThat(event.getEventKey()).isEqualTo(eventName);
+        assertThat(event.getEventKey()).isEqualTo(eventKey);
+        assertThat(event.getEventName()).isEqualTo(eventName);
         assertThat(event.getPayload()).isEqualTo(payload);
         assertThat(event.getStatus()).isEqualTo(InboxStatus.RECEIVED);
         assertThat(event.getReceivedAt()).isNotNull();
@@ -116,8 +117,8 @@ public class InboxEventTest {
     }
 
     @Test
-    @DisplayName("발송 실패 시 재시도 횟수를 증가하고 에러 메시지를 저장한다.")
-    void dispatchFail_success() {
+    @DisplayName("발송 실패 시 재시도 가능하면 RECEIVED 상태로 되돌린다.")
+    void dispatchFail_WhenCanRetry_marksReceived() {
         //given
         InboxEvent event = createInboxEvent();
         int initialCount = event.getRetryCount();
@@ -129,6 +130,25 @@ public class InboxEventTest {
         //then
         assertThat(event.getRetryCount()).isEqualTo(initialCount + 1);
         assertThat(event.getErrorMessage()).isEqualTo(errorMessage);
+        assertThat(event.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("발송 실패 시 재시도 횟수 초과면 FAILED 상태가 된다.")
+    void dispatchFail_WhenRetryExceeded_marksFailed() {
+        //given
+        InboxEvent event = createInboxEvent();
+        event.incrementRetryCount();
+        event.incrementRetryCount();
+        String errorMessage = "Dispatch failed";
+
+        //when
+        event.dispatchFail(errorMessage);
+
+        //then
+        assertThat(event.getRetryCount()).isEqualTo(3);
+        assertThat(event.getErrorMessage()).isEqualTo(errorMessage);
+        assertThat(event.getStatus()).isEqualTo(InboxStatus.FAILED);
     }
 
     @Test

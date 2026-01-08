@@ -58,7 +58,7 @@ public class InboxEvent extends BaseEntity {
     public static InboxEvent from(String eventKey, String eventName, String payload) {
         return InboxEvent.builder()
                 .eventKey(eventKey)
-                .eventKey(eventName)
+                .eventName(eventName)
                 .payload(payload)
                 .status(InboxStatus.RECEIVED)
                 .receivedAt(LocalDateTime.now())
@@ -95,6 +95,10 @@ public class InboxEvent extends BaseEntity {
         this.processedAt = LocalDateTime.now();
     }
 
+    public void markProcessing() {
+        this.status = InboxStatus.PROCESSING;
+    }
+
     public void dispatchSuccess() {
         incrementRetryCount();
         markCompleted();
@@ -103,5 +107,10 @@ public class InboxEvent extends BaseEntity {
     public void dispatchFail(String errMessage) {
         incrementRetryCount();
         setErrorMessage(errMessage);
+        if (canRetry()) {
+            this.status = InboxStatus.RECEIVED;
+            return;
+        }
+        this.status = InboxStatus.FAILED;
     }
 }

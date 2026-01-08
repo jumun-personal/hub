@@ -24,7 +24,7 @@ public class InboxPollingScheduler {
     private final JpaInboxRepository inboxRepository;
 
     /**
-     * PROCESSING 상태의 이벤트 재처리
+     * RECEIVED/PROCESSING 상태 이벤트 재처리
      * 3초마다 폴링
      */
     @Async("schedulerExecutor")
@@ -32,15 +32,30 @@ public class InboxPollingScheduler {
     @Scheduled(fixedDelay = 3000)
     @Transactional
     public void retryProcessingEvents() {
-        // PROCESSING 상태이면서 10초 이상 지난 이벤트 조회
-        LocalDateTime threshold = LocalDateTime.now().minusSeconds(10);
-        List<InboxEvent> stuckEvents = inboxService.findByStatusAndModifiedAtBefore(InboxStatus.PROCESSING, threshold);
+        LocalDateTime now = LocalDateTime.now();
+        List<InboxEvent> receivedEvents = inboxService.findByStatusAndModifiedAtBefore(
+                InboxStatus.RECEIVED,
+                now.minusSeconds(1)
+        );
+        List<InboxEvent> stuckProcessingEvents = inboxService.findByStatusAndModifiedAtBefore(
+                InboxStatus.PROCESSING,
+                now.minusSeconds(10)
+        );
 
-        if (!stuckEvents.isEmpty()) {
-            log.info("Found {} stuck PROCESSING events", stuckEvents.size());
+        int total = receivedEvents.size() + stuckProcessingEvents.size();
+        if (total > 0) {
+            log.info(
+                    "Found {} inbox events to process (received={}, processing={})",
+                    total,
+                    receivedEvents.size(),
+                    stuckProcessingEvents.size()
+            );
         }
 
-        for (InboxEvent event : stuckEvents) {
+        for (InboxEvent event : receivedEvents) {
+            inboxService.inboxProcess(event);
+        }
+        for (InboxEvent event : stuckProcessingEvents) {
             inboxService.inboxProcess(event);
         }
     }
