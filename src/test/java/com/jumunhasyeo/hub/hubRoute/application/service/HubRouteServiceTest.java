@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -106,9 +107,9 @@ class HubRouteServiceTest {
         BuildRouteCommand command = new BuildRouteCommand(null, UUID.randomUUID(), "센터", center1.getAddress(), HubType.CENTER);
         when(hubRepository.findByIdIncludingCreating(command.hubId())).thenReturn(Optional.empty());
 
-        hubRouteService.buildRoutesForNewHub(command);
+        assertThrows(RuntimeException.class, () -> hubRouteService.buildRoutesForNewHub(command));
 
-        verify(hubRouteEventPublisher).publishRouteBuildFailed(any(), any());
+        verify(hubRouteEventPublisher, never()).publishRouteBuildFailed(any(), any());
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteRepository, never()).insertIgnore(any(Set.class));
     }

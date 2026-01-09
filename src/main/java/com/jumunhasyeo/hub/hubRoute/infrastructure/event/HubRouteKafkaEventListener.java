@@ -27,18 +27,14 @@ public class HubRouteKafkaEventListener {
     @KafkaListener(
             topics = "${spring.kafka.topics.hub}",
             groupId = "${spring.kafka.consumer.hub-route}",
-            containerFactory = "kafkaListenerContainerFactory"
+            containerFactory = "hubRouteKafkaListenerContainerFactory"
     )
     public void listen(
             @Payload String event,
             @Header(name = "eventType", required = false) String fullTypeName
-    ) {
-        try {
-            String simpleClassName = KafkaUtil.getClassName(fullTypeName);
-            dispatch(event, simpleClassName);
-        }catch (Exception e){
-            log.error("Error processing event: {}", e.getMessage(), e);
-        }
+    ) throws JsonProcessingException {
+        String simpleClassName = KafkaUtil.getClassName(fullTypeName);
+        dispatch(event, simpleClassName);
     }
 
     public void dispatch(String payload, String simpleClassName) throws JsonProcessingException {

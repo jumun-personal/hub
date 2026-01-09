@@ -45,24 +45,19 @@ public class HubRouteService {
      */
     @Transactional
     public void buildRoutesForNewHub(BuildRouteCommand command) {
-        try {
-            Set<HubRoute> hubRoutes = new HashSet<>();
-            HubType type = command.type();
-            if (type == HubType.CENTER) {
-                hubRoutes.addAll(buildForCenter(command));
-            } else if (type == HubType.BRANCH) {
-                hubRoutes.addAll(buildForBranch(command));
-            }
-
-            List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
-                    .map(HubRouteCreatedEvent::from)
-                    .collect(Collectors.toList());
-            hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
-            hubRouteEventPublisher.publishRouteBuildCompleted(command);
-        } catch (Exception e) {
-            log.error("HubRoute build failed for hubId: {}", command.hubId(), e);
-            hubRouteEventPublisher.publishRouteBuildFailed(command, e.getMessage());
+        Set<HubRoute> hubRoutes = new HashSet<>();
+        HubType type = command.type();
+        if (type == HubType.CENTER) {
+            hubRoutes.addAll(buildForCenter(command));
+        } else if (type == HubType.BRANCH) {
+            hubRoutes.addAll(buildForBranch(command));
         }
+
+        List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
+                .map(HubRouteCreatedEvent::from)
+                .collect(Collectors.toList());
+        hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
+        hubRouteEventPublisher.publishRouteBuildCompleted(command);
     }
 
     /**

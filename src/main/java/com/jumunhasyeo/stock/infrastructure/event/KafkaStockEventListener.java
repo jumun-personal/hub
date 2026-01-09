@@ -28,14 +28,10 @@ public class KafkaStockEventListener {
     public void listen(
             @Payload String payload,
             @Header(name = "eventType", required = false) String eventType
-    ) {
-        try {
-            log.info("Received event. EventType: {}, Payload: {}", eventType, payload);
-            String className = orderAclService.convert(eventType);
-            dispatch(payload, className);
-        }catch (Exception e){
-            log.error("Error processing event. EventType: {}, Payload: {}, Error: {}", eventType, payload, e.getMessage());
-        }
+    ) throws JsonProcessingException {
+        log.info("Received event. EventType: {}, Payload: {}", eventType, payload);
+        String className = orderAclService.convert(eventType);
+        dispatch(payload, className);
     }
 
     public void dispatch(String payload, String simpleClassName) throws JsonProcessingException {
