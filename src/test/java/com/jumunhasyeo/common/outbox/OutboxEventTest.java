@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.outbox;
+package com.jumunhasyeo.hub.infrastructure.outbox;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

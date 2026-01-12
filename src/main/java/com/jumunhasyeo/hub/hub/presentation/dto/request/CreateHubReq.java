@@ -32,6 +32,6 @@ public record CreateHubReq(
         HubType hubType
 ) {
         public boolean validate() { //branch hub 생성은 centerHubId 필수
-                return !(HubType.BRANCH.equals(this.hubType()) && this.centerHubId() != null);
+                return !(HubType.BRANCH.equals(this.hubType()) && this.centerHubId() == null);
         }
 }

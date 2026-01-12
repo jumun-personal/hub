@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.inbox;
+package com.jumunhasyeo.stock.infrastructure.inbox;
 
 import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;

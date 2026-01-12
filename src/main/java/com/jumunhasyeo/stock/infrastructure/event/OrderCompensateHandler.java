@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.common.Idempotency.db.application.DbIdempotentService;
 import com.jumunhasyeo.common.Idempotency.db.domain.DbIdempotentKey;
 import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
-import com.jumunhasyeo.common.inbox.InboxService;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxService;
 import com.jumunhasyeo.stock.application.StockService;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import lombok.RequiredArgsConstructor;

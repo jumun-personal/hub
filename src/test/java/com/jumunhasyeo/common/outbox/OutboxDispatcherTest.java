@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.outbox;
+package com.jumunhasyeo.hub.infrastructure.outbox;
 
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;

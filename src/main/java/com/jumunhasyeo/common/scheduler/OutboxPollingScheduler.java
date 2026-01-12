@@ -1,7 +1,7 @@
 package com.jumunhasyeo.common.scheduler;
 
-import com.jumunhasyeo.common.outbox.OutboxEvent;
-import com.jumunhasyeo.common.outbox.OutboxService;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxEvent;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static com.jumunhasyeo.common.outbox.OutboxStatus.FAILED;
-import static com.jumunhasyeo.common.outbox.OutboxStatus.PENDING;
+import static com.jumunhasyeo.hub.infrastructure.outbox.OutboxStatus.FAILED;
+import static com.jumunhasyeo.hub.infrastructure.outbox.OutboxStatus.PENDING;
 
 @Component
 @RequiredArgsConstructor

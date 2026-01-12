@@ -1,6 +1,6 @@
 package com.jumunhasyeo.stock.application;
 
-import com.jumunhasyeo.common.dynamic.StockLockType;
+import com.jumunhasyeo.stock.infrastructure.dynamic.StockLockType;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;

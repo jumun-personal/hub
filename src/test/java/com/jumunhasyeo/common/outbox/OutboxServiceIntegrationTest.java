@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.outbox;
+package com.jumunhasyeo.hub.infrastructure.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;

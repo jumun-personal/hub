@@ -1,8 +1,8 @@
 package com.jumunhasyeo.hub.hub.application;
 
-import com.jumunhasyeo.common.outbox.JpaOutboxRepository;
-import com.jumunhasyeo.common.outbox.OutboxEvent;
-import com.jumunhasyeo.common.outbox.OutboxStatus;
+import com.jumunhasyeo.hub.infrastructure.outbox.JpaOutboxRepository;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxEvent;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;

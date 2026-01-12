@@ -1,6 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.application;
 
-import com.jumunhasyeo.common.outbox.OutboxService;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;

@@ -1,6 +1,6 @@
 package com.jumunhasyeo.stock.application;
 
-import com.jumunhasyeo.common.dynamic.StockLockType;
+import com.jumunhasyeo.stock.infrastructure.dynamic.StockLockType;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;

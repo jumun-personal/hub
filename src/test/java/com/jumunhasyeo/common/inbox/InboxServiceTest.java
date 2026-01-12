@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.inbox;
+package com.jumunhasyeo.stock.infrastructure.inbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.common.exception.BusinessException;

@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.outbox;
+package com.jumunhasyeo.hub.infrastructure.outbox;
 
 import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
 import org.junit.jupiter.api.DisplayName;

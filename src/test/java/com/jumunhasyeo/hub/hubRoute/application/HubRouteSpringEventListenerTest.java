@@ -1,6 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.application;
 
-import com.jumunhasyeo.common.outbox.OutboxService;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;

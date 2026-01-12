@@ -1,8 +1,8 @@
 package com.jumunhasyeo.testsupport;
 
 import com.jumunhasyeo.common.Idempotency.db.infrastructure.repository.IdempotentKeyRepositoryAdapter;
-import com.jumunhasyeo.common.inbox.InboxRepositoryAdapter;
-import com.jumunhasyeo.common.outbox.OutboxRepositoryAdapter;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxRepositoryAdapter;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxRepositoryAdapter;
 import com.jumunhasyeo.company.infrastructure.repository.CompanyRepositoryAdapter;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.HubRepositoryAdapter;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepositoryCustomImpl;

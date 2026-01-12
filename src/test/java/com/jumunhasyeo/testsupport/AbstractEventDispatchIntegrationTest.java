@@ -1,7 +1,7 @@
 package com.jumunhasyeo.testsupport;
 
-import com.jumunhasyeo.common.inbox.InboxDispatcher;
-import com.jumunhasyeo.common.outbox.OutboxDispatcher;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxDispatcher;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxDispatcher;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.event.HubRouteEventHandler;
 import com.jumunhasyeo.stock.infrastructure.event.OrderCompensateHandler;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;

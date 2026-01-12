@@ -1,9 +1,9 @@
 package com.jumunhasyeo.common.scheduler;
 
-import com.jumunhasyeo.common.inbox.InboxEvent;
-import com.jumunhasyeo.common.inbox.InboxService;
-import com.jumunhasyeo.common.inbox.InboxStatus;
-import com.jumunhasyeo.common.inbox.JpaInboxRepository;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxEvent;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxService;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxStatus;
+import com.jumunhasyeo.stock.infrastructure.inbox.JpaInboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;

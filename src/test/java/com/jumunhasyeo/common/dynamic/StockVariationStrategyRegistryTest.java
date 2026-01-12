@@ -1,4 +1,4 @@
-package com.jumunhasyeo.common.dynamic;
+package com.jumunhasyeo.stock.infrastructure.dynamic;
 
 import com.jumunhasyeo.stock.application.StockVariationService;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;

@@ -1,6 +1,6 @@
 package com.jumunhasyeo.hub.hub.application;
 
-import com.jumunhasyeo.common.outbox.OutboxService;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
