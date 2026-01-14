@@ -1,4 +1,4 @@
-package com.jumunhasyeo.hub.hubRoute;
+package com.jumunhasyeo.hub.hubRoute.application.service;
 
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
@@ -12,7 +12,6 @@ import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.application.dto.request.RouteWeightQuery;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
-import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightApiService;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;

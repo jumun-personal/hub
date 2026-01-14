@@ -5,7 +5,6 @@ import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.hub.hubRoute.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
