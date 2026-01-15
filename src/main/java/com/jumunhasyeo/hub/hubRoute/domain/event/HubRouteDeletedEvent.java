@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.domain.event;
 
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxMessage;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -10,7 +11,7 @@ import java.util.UUID;
 @Schema(description = "HubRouteDeletedEvent")
 @AllArgsConstructor
 @Getter
-public class HubRouteDeletedEvent extends HubRouteDomainEvent{
+public class HubRouteDeletedEvent extends HubRouteDomainEvent implements OutboxMessage {
     @Schema(description = "경로 ID", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID routeId;
     @Schema(description = "출발 허브", example = "550e8400-e29b-41d4-a716-446655440000")
@@ -30,5 +31,15 @@ public class HubRouteDeletedEvent extends HubRouteDomainEvent{
                 route.getRouteWeight().getDurationMinutes(),
                 (int) route.getRouteWeight().getDistanceKm().doubleValue()
         );
+    }
+
+    @Override
+    public String eventName() {
+        return HubRouteDeletedEvent.class.getSimpleName();
+    }
+
+    @Override
+    public String eventKey() {
+        return getEventKey();
     }
 }

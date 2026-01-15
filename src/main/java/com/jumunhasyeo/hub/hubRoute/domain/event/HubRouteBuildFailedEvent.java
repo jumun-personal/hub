@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.domain.event;
 
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxMessage;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -9,7 +10,7 @@ import java.util.UUID;
 
 @Schema(description = "HubRouteBuildFailedEvent")
 @Getter
-public class HubRouteBuildFailedEvent extends HubRouteDomainEvent {
+public class HubRouteBuildFailedEvent extends HubRouteDomainEvent implements OutboxMessage {
     @Schema(description = "허브 ID", example = "550e8400-e29b-41d4-a716-446655440000")
     private final UUID hubId;
     @Schema(description = "중앙 허브 ID", example = "550e8400-e29b-41d4-a716-446655440000")
@@ -33,5 +34,15 @@ public class HubRouteBuildFailedEvent extends HubRouteDomainEvent {
                 command.type(),
                 reason
         );
+    }
+
+    @Override
+    public String eventName() {
+        return HubRouteBuildFailedEvent.class.getSimpleName();
+    }
+
+    @Override
+    public String eventKey() {
+        return getEventKey();
     }
 }

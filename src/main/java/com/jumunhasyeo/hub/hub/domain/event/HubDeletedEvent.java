@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.hub.domain.event;
 
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxMessage;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -9,7 +10,7 @@ import java.util.UUID;
 
 @Getter
 @Schema(description = "HubDeletedEvent")
-public class HubDeletedEvent extends HubDomainEvent {
+public class HubDeletedEvent extends HubDomainEvent implements OutboxMessage {
     @Schema(description = "허브 ID", example = "550e8400-e29b-41d4-a716-446655440000")
     private final UUID hubId;
     @Schema(description = "허브 이름", example = "송파B")
@@ -37,5 +38,15 @@ public class HubDeletedEvent extends HubDomainEvent {
                 hub.getHubType(),
                 userId
         );
+    }
+
+    @Override
+    public String eventName() {
+        return HubDeletedEvent.class.getSimpleName();
+    }
+
+    @Override
+    public String eventKey() {
+        return getEventKey();
     }
 }
