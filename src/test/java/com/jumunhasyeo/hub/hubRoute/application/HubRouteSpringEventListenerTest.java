@@ -6,6 +6,8 @@ import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
+import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
+import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
@@ -19,12 +21,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
-public class HubRouteSpringEventListenerTest {
+class HubRouteSpringEventListenerTest {
 
     @Mock
     private OutboxService outboxService;
@@ -33,81 +33,83 @@ public class HubRouteSpringEventListenerTest {
     private HubRouteSpringEventListener hubRouteSpringEventListener;
 
     @Test
-    @DisplayName("HubRouteCreatedEvent를 Outbox에 저장할 수 있다.")
-    void handleHubRouteCreated_success() {
-        //given
+    @DisplayName("HubRouteCreatedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_created_save() {
         HubRouteCreatedEvent event = createHubRouteCreatedEvent();
 
-        //when
-        hubRouteSpringEventListener.handleHubRouteCreated(event);
+        hubRouteSpringEventListener.handleBeforeCommit(event);
 
-        //then
-        then(outboxService).should(times(1)).save(any(HubRouteCreatedEvent.class));
+        then(outboxService).should().save(event);
     }
 
     @Test
-    @DisplayName("HubRouteDeletedEvent 리스트를 Outbox에 저장할 수 있다.")
-    void handleHubRouteDeleted_success() {
-        //given
+    @DisplayName("HubRouteDeletedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_deleted_save() {
         HubRouteDeletedEvent event = createHubRouteDeletedEvent();
 
-        //when
-        hubRouteSpringEventListener.handleHubRouteDeleted(event);
+        hubRouteSpringEventListener.handleBeforeCommit(event);
 
-        //then
-        then(outboxService).should(times(1)).save(any(HubRouteDeletedEvent.class));
+        then(outboxService).should().save(event);
     }
 
     @Test
-    @DisplayName("HubRouteCreatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubRouteCreated_success() {
-        //given
+    @DisplayName("HubRouteBuildCompletedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_buildCompleted_save() {
+        HubRouteBuildCompletedEvent event = new HubRouteBuildCompletedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.CENTER);
+
+        hubRouteSpringEventListener.handleBeforeCommit(event);
+
+        then(outboxService).should().save(event);
+    }
+
+    @Test
+    @DisplayName("HubRouteBuildFailedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_buildFailed_save() {
+        HubRouteBuildFailedEvent event = new HubRouteBuildFailedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.BRANCH, "failed");
+
+        hubRouteSpringEventListener.handleBeforeCommit(event);
+
+        then(outboxService).should().save(event);
+    }
+
+    @Test
+    @DisplayName("HubRouteCreatedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_created_publish() {
         HubRouteCreatedEvent event = createHubRouteCreatedEvent();
 
-        //when
-        hubRouteSpringEventListener.asyncHandleHubRouteCreated(event);
+        hubRouteSpringEventListener.handleAfterCommit(event);
 
-        //then
-        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubRouteCreatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubRouteCreated_WhenKafkaFails_doesNotMarkAsProcessed() {
-        //given
-        HubRouteCreatedEvent event = createHubRouteCreatedEvent();
-
-        //when
-        hubRouteSpringEventListener.asyncHandleHubRouteCreated(event);
-
-        //then
-        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
-    }
-
-    @Test
-    @DisplayName("HubRouteDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubRouteDeleted_success() {
-        //given
+    @DisplayName("HubRouteDeletedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_deleted_publish() {
         HubRouteDeletedEvent event = createHubRouteDeletedEvent();
 
-        //when
-        hubRouteSpringEventListener.asyncHandleHubRouteDeleted(event);
+        hubRouteSpringEventListener.handleAfterCommit(event);
 
-        //then
-        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubRouteDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubRouteDeleted_WhenKafkaFails_doesNotMarkAsProcessed() {
-        //given
-        HubRouteDeletedEvent event = createHubRouteDeletedEvent();
+    @DisplayName("HubRouteBuildCompletedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_buildCompleted_publish() {
+        HubRouteBuildCompletedEvent event = new HubRouteBuildCompletedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.CENTER);
 
-        //when
-        hubRouteSpringEventListener.asyncHandleHubRouteDeleted(event);
+        hubRouteSpringEventListener.handleAfterCommit(event);
 
-        //then
-        then(outboxService).should(times(1)).publishAfterCommit(event.getEventKey());
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
+    }
+
+    @Test
+    @DisplayName("HubRouteBuildFailedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_buildFailed_publish() {
+        HubRouteBuildFailedEvent event = new HubRouteBuildFailedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.BRANCH, "failed");
+
+        hubRouteSpringEventListener.handleAfterCommit(event);
+
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     private static HubRouteCreatedEvent createHubRouteCreatedEvent() {
@@ -123,8 +125,8 @@ public class HubRouteSpringEventListenerTest {
     private static HubRoute createHubRoute() {
         Hub startHub = createHub();
         Hub endHub = createHub();
-        RouteWeight weight = RouteWeight.of(BigDecimal.valueOf(30) ,5);
-        
+        RouteWeight weight = RouteWeight.of(BigDecimal.valueOf(30), 5);
+
         return HubRoute.builder()
                 .routeId(UUID.randomUUID())
                 .startHub(startHub)

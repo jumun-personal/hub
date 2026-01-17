@@ -38,7 +38,7 @@ public class HubRouteSpringEventListenerIntegrationTest extends AbstractIntegrat
         HubRouteCreatedEvent event = HubRouteCreatedEvent.from(route1);
 
         //when
-        hubRouteSpringEventListener.handleHubRouteCreated(event);
+        hubRouteSpringEventListener.handleBeforeCommit(event);
 
         //then
         List<OutboxEvent> outboxEvents = jpaOutboxRepository.findAll();
@@ -55,7 +55,7 @@ public class HubRouteSpringEventListenerIntegrationTest extends AbstractIntegrat
         HubRouteDeletedEvent event = HubRouteDeletedEvent.from(route1);
 
         //when
-        hubRouteSpringEventListener.handleHubRouteDeleted(event);
+        hubRouteSpringEventListener.handleBeforeCommit(event);
 
         //then
         List<OutboxEvent> outboxEvents = jpaOutboxRepository.findAll();

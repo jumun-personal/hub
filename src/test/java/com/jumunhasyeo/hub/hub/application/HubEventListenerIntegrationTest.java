@@ -37,7 +37,7 @@ public class HubEventListenerIntegrationTest extends AbstractIntegrationTest {
         HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
 
         //when
-        hubEventListener.handleHubCreated(event);
+        hubEventListener.handleBeforeCommit(event);
 
         //then
         List<OutboxEvent> outboxEvents = jpaOutboxRepository.findAll();
@@ -54,7 +54,7 @@ public class HubEventListenerIntegrationTest extends AbstractIntegrationTest {
         HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
 
         //when
-        hubEventListener.handleHubDeleted(event);
+        hubEventListener.handleBeforeCommit(event);
 
         //then
         List<OutboxEvent> outboxEvents = jpaOutboxRepository.findAll();
@@ -71,7 +71,7 @@ public class HubEventListenerIntegrationTest extends AbstractIntegrationTest {
         HubNameUpdatedEvent event = HubNameUpdatedEvent.of(hub);
 
         //when
-        hubEventListener.handleHubNameUpdated(event);
+        hubEventListener.handleBeforeCommit(event);
 
         //then
         List<OutboxEvent> outboxEvents = jpaOutboxRepository.findAll();

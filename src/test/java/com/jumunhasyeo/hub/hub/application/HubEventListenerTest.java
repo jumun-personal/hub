@@ -21,7 +21,7 @@ import java.util.UUID;
 import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
-public class HubEventListenerTest {
+class HubEventListenerTest {
 
     @Mock
     private OutboxService outboxService;
@@ -30,154 +30,81 @@ public class HubEventListenerTest {
     private HubEventListener hubEventListener;
 
     @Test
-    @DisplayName("HubCreatedEvent를 Outbox에 저장할 수 있다.")
-    void handleHubCreated_success() {
-        //given
-        Hub hub = createHub();
-        HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
+    @DisplayName("HubCreatedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_hubCreated_save() {
+        HubCreatedEvent event = HubCreatedEvent.centerHub(createHub());
 
-        //when
-        hubEventListener.handleHubCreated(event);
-
-        //then
-        then(outboxService).should().save(event);
-    }
-
-    @Test
-    @DisplayName("HubDeletedEvent를 Outbox에 저장할 수 있다.")
-    void handleHubDeleted_success() {
-        //given
-        Hub hub = createHub();
-        HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
-
-        //when
-        hubEventListener.handleHubDeleted(event);
-
-        //then
-        then(outboxService).should().save(event);
-    }
-
-    @Test
-    @DisplayName("HubNameUpdatedEvent를 Outbox에 저장할 수 있다.")
-    void handleHubNameUpdated_success() {
-        //given
-        Hub hub = createHub();
-        HubNameUpdatedEvent event = HubNameUpdatedEvent.of(hub);
-
-        //when
-        hubEventListener.handleHubNameUpdated(event);
-
-        //then
-        then(outboxService).should().save(event);
-    }
-
-    @Test
-    @DisplayName("HubUpdatedEvent를 Outbox에 저장할 수 있다.")
-    void handleHubUpdated_success() {
-        Hub hub = createHub();
-        HubUpdatedEvent event = HubUpdatedEvent.of(hub);
-
-        hubEventListener.handleHubUpdated(event);
+        hubEventListener.handleBeforeCommit(event);
 
         then(outboxService).should().save(event);
     }
 
     @Test
-    @DisplayName("HubCreatedEvent를 커밋 후 Outbox 발행 처리한다.")
-    void asyncHandleHubCreated_success() {
-        //given
-        Hub hub = createHub();
-        HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
+    @DisplayName("HubDeletedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_hubDeleted_save() {
+        HubDeletedEvent event = HubDeletedEvent.from(createHub(), 1L);
 
-        //when
-        hubEventListener.asyncHandleHubCreated(event);
+        hubEventListener.handleBeforeCommit(event);
 
-        //then
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxService).should().save(event);
     }
 
     @Test
-    @DisplayName("HubCreatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubCreated_WhenKafkaFails_doesNotMarkAsProcessed() {
-        //given
-        Hub hub = createHub();
-        HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
+    @DisplayName("HubNameUpdatedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_hubNameUpdated_save() {
+        HubNameUpdatedEvent event = HubNameUpdatedEvent.of(createHub());
 
-        //when
-        hubEventListener.asyncHandleHubCreated(event);
+        hubEventListener.handleBeforeCommit(event);
 
-        //then
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxService).should().save(event);
     }
 
     @Test
-    @DisplayName("HubDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubDeleted_success() {
-        //given
-        Hub hub = createHub();
-        HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
+    @DisplayName("HubUpdatedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
+    void handleBeforeCommit_hubUpdated_save() {
+        HubUpdatedEvent event = HubUpdatedEvent.of(createHub());
 
-        //when
-        hubEventListener.asyncHandleHubDeleted(event);
+        hubEventListener.handleBeforeCommit(event);
 
-        //then
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxService).should().save(event);
     }
 
     @Test
-    @DisplayName("HubNameUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleNameUpdated_success() {
-        //given
-        Hub hub = createHub();
-        HubNameUpdatedEvent event = HubNameUpdatedEvent.of(hub);
+    @DisplayName("HubCreatedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_hubCreated_publish() {
+        HubCreatedEvent event = HubCreatedEvent.centerHub(createHub());
 
-        //when
-        hubEventListener.asyncHandleNameUpdated(event);
-
-        //then
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
-    }
-
-    @Test
-    @DisplayName("HubUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubUpdated_success() {
-        Hub hub = createHub();
-        HubUpdatedEvent event = HubUpdatedEvent.of(hub);
-
-        hubEventListener.asyncHandleHubUpdated(event);
+        hubEventListener.handleAfterCommit(event);
 
         then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubUpdated_fail() {
-        Hub hub = createHub();
-        HubUpdatedEvent event = HubUpdatedEvent.of(hub);
+    @DisplayName("HubDeletedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_hubDeleted_publish() {
+        HubDeletedEvent event = HubDeletedEvent.from(createHub(), 1L);
 
-        hubEventListener.asyncHandleHubUpdated(event);
-
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
-    }
-
-    @Test
-    @DisplayName("HubDeletedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleHubDeleted_fail() {
-        Hub hub = createHub();
-        HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
-
-        hubEventListener.asyncHandleHubDeleted(event);
+        hubEventListener.handleAfterCommit(event);
 
         then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
-    @DisplayName("HubNameUpdatedEvent는 커밋 후 Outbox 발행 처리가 호출된다.")
-    void asyncHandleNameUpdated_fail() {
-        Hub hub = createHub();
-        HubNameUpdatedEvent event = HubNameUpdatedEvent.of(hub);
+    @DisplayName("HubNameUpdatedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_hubNameUpdated_publish() {
+        HubNameUpdatedEvent event = HubNameUpdatedEvent.of(createHub());
 
-        hubEventListener.asyncHandleNameUpdated(event);
+        hubEventListener.handleAfterCommit(event);
+
+        then(outboxService).should().publishAfterCommit(event.getEventKey());
+    }
+
+    @Test
+    @DisplayName("HubUpdatedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
+    void handleAfterCommit_hubUpdated_publish() {
+        HubUpdatedEvent event = HubUpdatedEvent.of(createHub());
+
+        hubEventListener.handleAfterCommit(event);
 
         then(outboxService).should().publishAfterCommit(event.getEventKey());
     }
