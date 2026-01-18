@@ -1,6 +1,5 @@
 package com.jumunhasyeo.hub.hub.domain.event;
 
-import com.jumunhasyeo.hub.infrastructure.outbox.OutboxMessage;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -11,7 +10,7 @@ import java.util.UUID;
 
 @Schema(description = "HubCreatedEvent")
 @Getter
-public final class HubCreatedEvent extends HubDomainEvent implements OutboxMessage {
+public final class HubCreatedEvent extends HubDomainEvent {
 
     @Schema(description = "중앙 허브 ID", example = "550e8400-e29b-41d4-a716-446655440000")
     private final UUID centerHubId;
@@ -52,13 +51,4 @@ public final class HubCreatedEvent extends HubDomainEvent implements OutboxMessa
         );
     }
 
-    @Override
-    public String eventName() {
-        return HubCreatedEvent.class.getSimpleName();
-    }
-
-    @Override
-    public String eventKey() {
-        return getEventKey();
-    }
 }

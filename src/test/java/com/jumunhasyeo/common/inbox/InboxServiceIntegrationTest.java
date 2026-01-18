@@ -1,7 +1,11 @@
-package com.jumunhasyeo.stock.infrastructure.inbox;
+package com.jumunhasyeo.common.inbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.stock.infrastructure.event.OrderCancelEvent;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxEvent;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxService;
+import com.jumunhasyeo.stock.infrastructure.inbox.InboxStatus;
+import com.jumunhasyeo.stock.infrastructure.inbox.JpaInboxRepository;
 import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

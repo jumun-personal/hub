@@ -1,6 +1,5 @@
 package com.jumunhasyeo.hub.hubRoute.domain.event;
 
-import com.jumunhasyeo.hub.infrastructure.outbox.OutboxMessage;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -11,7 +10,7 @@ import java.util.UUID;
 @Schema(description = "HubRouteCreatedEvent")
 @AllArgsConstructor
 @Getter
-public class HubRouteCreatedEvent extends HubRouteDomainEvent implements OutboxMessage {
+public class HubRouteCreatedEvent extends HubRouteDomainEvent {
     @Schema(description = "경로 ID", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID routeId;
     @Schema(description = "출발 허브", example = "550e8400-e29b-41d4-a716-446655440000")
@@ -33,13 +32,4 @@ public class HubRouteCreatedEvent extends HubRouteDomainEvent implements OutboxM
         );
     }
 
-    @Override
-    public String eventName() {
-        return HubRouteCreatedEvent.class.getSimpleName();
-    }
-
-    @Override
-    public String eventKey() {
-        return getEventKey();
-    }
 }
