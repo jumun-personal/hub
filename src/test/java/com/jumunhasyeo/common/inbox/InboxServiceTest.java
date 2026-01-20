@@ -46,6 +46,7 @@ public class InboxServiceTest {
         //given
         OrderCancelEvent event = new OrderCancelEvent(UUID.randomUUID(), "", LocalDateTime.now());
         String expectedJson = "{\"key\":\"test-key\"}";
+        given(inboxRepository.existsByEventKey(event.getKey())).willReturn(false);
         given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
 
         //when
@@ -68,6 +69,7 @@ public class InboxServiceTest {
         //given
         OrderRolledBackEvent event = new OrderRolledBackEvent(UUID.randomUUID(), "ROLLED_BACK", LocalDateTime.now());
         String expectedJson = "{\"key\":\"test-key\"}";
+        given(inboxRepository.existsByEventKey(event.getKey())).willReturn(false);
         given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
 
         //when
@@ -82,6 +84,18 @@ public class InboxServiceTest {
         assertThat(savedEvent.getEventName()).isEqualTo(ORDER_ROLLED_BACK_EVENT.getEventName());
         assertThat(savedEvent.getPayload()).isEqualTo(expectedJson);
         assertThat(savedEvent.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("동일 eventKey가 있으면 Inbox 저장을 건너뛴다.")
+    void save_WhenEventKeyAlreadyExists_skip() throws Exception {
+        OrderCancelEvent event = new OrderCancelEvent(UUID.randomUUID(), "", LocalDateTime.now());
+        given(inboxRepository.existsByEventKey(event.getKey())).willReturn(true);
+
+        inboxService.save(event);
+
+        then(inboxRepository).should(never()).save(any());
+        then(objectMapper).should(never()).writeValueAsString(any());
     }
 
     @Test

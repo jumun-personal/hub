@@ -26,6 +26,7 @@ public class InboxRepositoryAdapter implements InboxRepository {
         return jpaInboxRepository.findByEventKey(eventKey);
     }
     
+    @Override
     public boolean existsByEventKey(String eventKey) {
         return jpaInboxRepository.existsByEventKey(eventKey);
     }

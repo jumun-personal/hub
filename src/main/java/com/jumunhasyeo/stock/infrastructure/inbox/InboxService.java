@@ -33,6 +33,11 @@ public class InboxService {
     private final ObjectMapper objectMapper;
 
     public void save(OrderCompensationEvent event) throws JsonProcessingException {
+        if (inboxRepository.existsByEventKey(event.getKey())) {
+            log.info("Inbox event already exists. skip save. eventKey={}", event.getKey());
+            return;
+        }
+
         InboxEvent inboxEvent = InboxEvent.builder()
                 .eventKey(event.getKey())
                 .eventName(resolveEventName(event))
