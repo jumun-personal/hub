@@ -36,7 +36,14 @@ public class HubKafkaEventListener {
             @Payload String event,
             @Header(name = "eventType", required = false) String fullTypeName
     ) throws JsonProcessingException {
+        if (fullTypeName == null) {
+            return;
+        }
+
         String simpleClassName = KafkaUtil.getClassName(fullTypeName);
+        if (simpleClassName.isBlank()) {
+            return;
+        }
         dispatch(event, simpleClassName);
     }
 
@@ -54,8 +61,7 @@ public class HubKafkaEventListener {
             HubRouteBuildFailedEvent event = objectMapper.readValue(payload, HubRouteBuildFailedEvent.class);
             hubCreationSagaService.compensate(event.getHubId(), event.getReason());
         } else {
-            log.info("Unhandled event type: {}", simpleClassName);
-            log.info("Unhandled event payload: {}", payload);
+            return;
         }
     }
 }

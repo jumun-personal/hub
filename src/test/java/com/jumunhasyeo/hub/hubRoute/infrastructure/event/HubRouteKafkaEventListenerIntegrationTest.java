@@ -18,6 +18,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 public class HubRouteKafkaEventListenerIntegrationTest extends AbstractEventDispatchIntegrationTest {
@@ -63,6 +64,15 @@ public class HubRouteKafkaEventListenerIntegrationTest extends AbstractEventDisp
 
         //then
         then(hubRouteEventHandler).should(times(1)).hubDeleted(any(HubDeletedEvent.class));
+    }
+
+    @Test
+    @DisplayName("eventType이 null이면 이벤트를 건너뛴다.")
+    void listen_WhenEventTypeNull_skip() throws Exception {
+        hubRouteKafkaEventListener.listen("{}", null);
+
+        then(hubRouteEventHandler).should(never()).hubCreated(any());
+        then(hubRouteEventHandler).should(never()).hubDeleted(any());
     }
 
     private static Hub createHub() {

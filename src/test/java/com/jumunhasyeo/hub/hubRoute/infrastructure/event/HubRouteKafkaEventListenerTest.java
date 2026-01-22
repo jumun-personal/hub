@@ -82,6 +82,24 @@ public class HubRouteKafkaEventListenerTest {
         then(hubRouteEventHandler).should(never()).hubDeleted(any());
     }
 
+    @Test
+    @DisplayName("eventType 헤더가 없으면 listen은 skip 한다.")
+    void listen_WhenHeaderMissing_skip() throws Exception {
+        hubRouteKafkaEventListener.listen("{}", null);
+
+        then(hubRouteEventHandler).should(never()).hubCreated(any());
+        then(hubRouteEventHandler).should(never()).hubDeleted(any());
+    }
+
+    @Test
+    @DisplayName("미지원 eventType이면 listen은 skip 한다.")
+    void listen_WhenUnsupportedType_skip() throws Exception {
+        hubRouteKafkaEventListener.listen("{}", "UNKNOWN");
+
+        then(hubRouteEventHandler).should(never()).hubCreated(any());
+        then(hubRouteEventHandler).should(never()).hubDeleted(any());
+    }
+
     private static Hub createHub() {
         return Hub.builder()
                 .hubId(UUID.randomUUID())

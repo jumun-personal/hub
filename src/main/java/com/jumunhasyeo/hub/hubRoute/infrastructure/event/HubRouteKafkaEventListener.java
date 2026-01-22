@@ -33,7 +33,14 @@ public class HubRouteKafkaEventListener {
             @Payload String event,
             @Header(name = "eventType", required = false) String fullTypeName
     ) throws JsonProcessingException {
+        if (fullTypeName == null) {
+            return;
+        }
+
         String simpleClassName = KafkaUtil.getClassName(fullTypeName);
+        if (simpleClassName == null || simpleClassName.isBlank()) {
+            return;
+        }
         dispatch(event, simpleClassName);
     }
 
@@ -50,8 +57,7 @@ public class HubRouteKafkaEventListener {
                 || simpleClassName.equals(HUB_ROUTE_BUILD_FAILED_EVENT.getEventName())) {
             log.debug("Skip hub-route build result event: {}", simpleClassName);
         } else {
-            log.info("Unhandled event type: {}", simpleClassName);
-            log.info("Unhandled event payload: {}", payload);
+            return;
         }
     }
 }
