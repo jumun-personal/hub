@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 public class KafkaStockEventListenerIntegrationTest extends AbstractEventDispatchIntegrationTest {
 
@@ -48,5 +49,16 @@ public class KafkaStockEventListenerIntegrationTest extends AbstractEventDispatc
 
         //then
         then(orderCompensateHandler).should().compensate(any(OrderRolledBackEvent.class));
+    }
+
+    @Test
+    @DisplayName("eventType이 null이면 이벤트를 건너뛴다.")
+    void listen_WhenEventTypeNull_skip() throws Exception {
+        String payload = "{\"data\":\"test\"}";
+
+        kafkaStockEventListener.listen(payload, null);
+
+        then(orderCompensateHandler).should(never()).compensate(any(OrderCancelEvent.class));
+        then(orderCompensateHandler).should(never()).compensate(any(OrderRolledBackEvent.class));
     }
 }

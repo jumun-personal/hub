@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +25,9 @@ public class KafkaStockEventListenerTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private OrderAclService orderAclService;
 
     @InjectMocks
     private KafkaStockEventListener kafkaStockEventListener;
@@ -71,6 +75,32 @@ public class KafkaStockEventListenerTest {
         kafkaStockEventListener.dispatch(payload, simpleClassName);
 
         //then
+        then(orderCompensateHandler).should(never()).compensate(any(OrderCancelEvent.class));
+        then(orderCompensateHandler).should(never()).compensate(any(OrderRolledBackEvent.class));
+    }
+
+    @Test
+    @DisplayName("eventType 헤더가 null이면 이벤트를 건너뛴다.")
+    void listen_WhenEventTypeNull_skip() throws Exception {
+        String payload = "{\"orderId\":\"123\"}";
+        given(orderAclService.convert(null)).willReturn(Optional.empty());
+
+        kafkaStockEventListener.listen(payload, null);
+
+        then(orderAclService).should().convert(null);
+        then(orderCompensateHandler).should(never()).compensate(any(OrderCancelEvent.class));
+        then(orderCompensateHandler).should(never()).compensate(any(OrderRolledBackEvent.class));
+    }
+
+    @Test
+    @DisplayName("미지원 eventType이면 이벤트를 건너뛴다.")
+    void listen_WhenEventTypeUnsupported_skip() throws Exception {
+        String payload = "{\"orderId\":\"123\"}";
+        given(orderAclService.convert("UNKNOWN")).willReturn(Optional.empty());
+
+        kafkaStockEventListener.listen(payload, "UNKNOWN");
+
+        then(orderAclService).should().convert("UNKNOWN");
         then(orderCompensateHandler).should(never()).compensate(any(OrderCancelEvent.class));
         then(orderCompensateHandler).should(never()).compensate(any(OrderRolledBackEvent.class));
     }

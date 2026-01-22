@@ -9,6 +9,8 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORDER_CANCEL_EVENT;
 import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORDER_ROLLED_BACK_EVENT;
 
@@ -30,8 +32,16 @@ public class KafkaStockEventListener {
             @Header(name = "eventType", required = false) String eventType
     ) throws JsonProcessingException {
         log.info("Received event. EventType: {}, Payload: {}", eventType, payload);
-        String className = orderAclService.convert(eventType);
-        dispatch(payload, className);
+        Optional<String> mappedClassName = orderAclService.convert(eventType);
+        if (mappedClassName.isEmpty()) {
+            if (eventType == null) {
+                log.warn("Skip stock event due to missing eventType header");
+            } else {
+                log.warn("Skip stock event due to unsupported eventType={}", eventType);
+            }
+            return;
+        }
+        dispatch(payload, mappedClassName.get());
     }
 
     public void dispatch(String payload, String simpleClassName) throws JsonProcessingException {
