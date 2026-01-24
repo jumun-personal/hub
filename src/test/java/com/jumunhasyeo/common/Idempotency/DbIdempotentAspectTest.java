@@ -36,6 +36,7 @@ class DbIdempotentAspectTest {
     private DbIdempotentAspect dbIdempotentAspect;
 
     private static final String TEST_KEY = "test-idempotency-key";
+    private static final String PREFIXED_KEY = "STOCK_STORE:" + TEST_KEY;
     private static final int TTL_DAYS = 7;
     private static final long TTL_SECONDS = TTL_DAYS * 24 * 3600L;
     private static final Object EXPECTED_RESULT = "test-result";
@@ -44,6 +45,7 @@ class DbIdempotentAspectTest {
     @BeforeEach
     void setUp() {
         given(dbIdempotent.ttlDays()).willReturn(TTL_DAYS);
+        given(dbIdempotent.keyPrefix()).willReturn("");
         given(joinPoint.getArgs()).willReturn(new Object[]{TEST_KEY});
     }
 
@@ -199,6 +201,48 @@ class DbIdempotentAspectTest {
         // then
         then(idempotentService).should().setIfAbsent(TEST_KEY, IdempotentStatus.PROCESSING, expectedTtlSeconds, payload);
         then(idempotentService).should().saveStatus(TEST_KEY, IdempotentStatus.SUCCESS, expectedTtlSeconds);
+    }
+
+    @Test
+    @DisplayName("keyPrefix가 있으면 접두어가 붙은 키로 상태를 저장한다.")
+    void handleIdempotency_WithKeyPrefix_UsesPrefixedStatusKey() throws Throwable {
+        // given
+        given(dbIdempotent.keyPrefix()).willReturn("STOCK_STORE:");
+        given(joinPoint.getArgs()).willReturn(new Object[]{TEST_KEY, "payload-body"});
+        given(idempotentService.getCurrentStatus(PREFIXED_KEY)).willReturn(IdempotentStatus.NONE);
+        given(idempotentService.setIfAbsent(PREFIXED_KEY, IdempotentStatus.PROCESSING, TTL_SECONDS, "payload-body"))
+                .willReturn(true);
+        given(joinPoint.proceed()).willReturn(EXPECTED_RESULT);
+
+        // when
+        Object result = dbIdempotentAspect.handleIdempotency(joinPoint, dbIdempotent);
+
+        // then
+        assertThat(result).isEqualTo(EXPECTED_RESULT);
+        then(idempotentService).should().getCurrentStatus(PREFIXED_KEY);
+        then(idempotentService).should().setIfAbsent(PREFIXED_KEY, IdempotentStatus.PROCESSING, TTL_SECONDS, "payload-body");
+        then(idempotentService).should().saveStatus(PREFIXED_KEY, IdempotentStatus.SUCCESS, TTL_SECONDS);
+    }
+
+    @Test
+    @DisplayName("keyPrefix가 있을 때 실패하면 접두어 키로 에러를 저장한다.")
+    void handleIdempotency_WithKeyPrefix_OnFailure_SavesErrorByPrefixedKey() throws Throwable {
+        // given
+        RuntimeException expectedException = new RuntimeException("Business logic error");
+        given(dbIdempotent.keyPrefix()).willReturn("STOCK_STORE:");
+        given(joinPoint.getArgs()).willReturn(new Object[]{TEST_KEY});
+        given(idempotentService.getCurrentStatus(PREFIXED_KEY)).willReturn(IdempotentStatus.NONE);
+        given(idempotentService.setIfAbsent(PREFIXED_KEY, IdempotentStatus.PROCESSING, TTL_SECONDS, payload))
+                .willReturn(true);
+        given(joinPoint.proceed()).willThrow(expectedException);
+
+        // when & then
+        assertThatThrownBy(() -> dbIdempotentAspect.handleIdempotency(joinPoint, dbIdempotent))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Business logic error");
+
+        then(idempotentService).should().saveStatus(PREFIXED_KEY, IdempotentStatus.FAIL, TTL_SECONDS);
+        then(idempotentService).should().saveError(PREFIXED_KEY, "Business logic error", TTL_SECONDS);
     }
 
 }

@@ -35,7 +35,7 @@ public class StockHistory extends BaseEntity {
     @Column(name = "memo", length = 500)
     private String memo;
 
-    @Column(name = "idempotencyKey", unique = true)
+    @Column(name = "idempotencyKey")
     private String idempotencyKey;
 
     private StockHistory(UUID hubId, UUID productId, StockHistoryType type, int quantity, String memo, String idempotencyKey) {

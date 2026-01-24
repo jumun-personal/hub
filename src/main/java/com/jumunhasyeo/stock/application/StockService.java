@@ -91,6 +91,7 @@ public class StockService {
         return hubClient.existHub(command.hubId()) && productClient.existProduct(command.productId());
     }
 
+    @DbIdempotent(ttlDays = 1, keyPrefix = "STOCK_STORE:")
     @Transactional
     public List<StockHistoryRes> store(String idempotencyKey, List<StoreStockCommand> commandList) {
         List<StockHistory> histories = commandList.stream()
@@ -109,6 +110,7 @@ public class StockService {
                 .toList();
     }
 
+    @DbIdempotent(ttlDays = 1, keyPrefix = "STOCK_SHIPPED:")
     @Transactional
     public List<StockHistoryRes> shipped(String idempotencyKey, List<ShippedStockCommand> commandList) {
         List<StockHistory> histories = commandList.stream()

@@ -28,7 +28,8 @@ public class DbIdempotentAspect {
 
         Object[] args = joinPoint.getArgs();
         // 첫 번째 파라미터 = 멱등키
-        String statusKey = (String) args[0];
+        String rawKey = (String) args[0];
+        String statusKey = composeStatusKey(dbIdempotent, rawKey);
         // 두 번째 파라미터 = 페이로드
         Object payload = "";
         if(args.length >= 2){
@@ -89,5 +90,13 @@ public class DbIdempotentAspect {
 
     private long getTtlSeconds(DbIdempotent dbIdempotent) {
         return dbIdempotent.ttlDays() * 24 * 3600L;
+    }
+
+    private String composeStatusKey(DbIdempotent dbIdempotent, String rawKey) {
+        String keyPrefix = dbIdempotent.keyPrefix();
+        if (keyPrefix == null || keyPrefix.isBlank()) {
+            return rawKey;
+        }
+        return keyPrefix + rawKey;
     }
 }

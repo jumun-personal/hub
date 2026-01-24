@@ -30,6 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -272,6 +273,9 @@ class StockServiceTest {
         assertThat(result.get(0).productId()).isEqualTo(productId);
         assertThat(result.get(0).type()).isEqualTo(StockHistory.StockHistoryType.STORE.name());
         assertThat(result.get(0).quantity()).isEqualTo(10);
+        verify(stockHistoryRepository).saveAll(argThat(histories ->
+                histories.size() == 1 && "idem-store".equals(histories.get(0).getIdempotencyKey())
+        ));
         verifyNoInteractions(stockVariationService);
     }
 
@@ -292,6 +296,54 @@ class StockServiceTest {
         assertThat(result.get(0).productId()).isEqualTo(productId);
         assertThat(result.get(0).type()).isEqualTo(StockHistory.StockHistoryType.SHIPPED.name());
         assertThat(result.get(0).quantity()).isEqualTo(5);
+        verify(stockHistoryRepository).saveAll(argThat(histories ->
+                histories.size() == 1 && "idem-shipped".equals(histories.get(0).getIdempotencyKey())
+        ));
+        verifyNoInteractions(stockVariationService);
+    }
+
+    @Test
+    @DisplayName("입고 이력 다건 저장 시 요청 단위 멱등키를 공통으로 저장한다.")
+    void store_should_use_same_idempotency_key_for_all_lines() {
+        UUID hubId = UUID.randomUUID();
+        UUID productId1 = UUID.randomUUID();
+        UUID productId2 = UUID.randomUUID();
+        List<StoreStockCommand> commands = List.of(
+                new StoreStockCommand(hubId, productId1, 10),
+                new StoreStockCommand(hubId, productId2, 20)
+        );
+
+        given(stockHistoryRepository.saveAll(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+        List<StockHistoryRes> result = stockService.store("idem-batch-store", commands);
+
+        assertThat(result).hasSize(2);
+        verify(stockHistoryRepository).saveAll(argThat(histories ->
+                histories.size() == 2
+                        && histories.stream().allMatch(history -> "idem-batch-store".equals(history.getIdempotencyKey()))
+        ));
+    }
+
+    @Test
+    @DisplayName("출고 이력 다건 저장 시 요청 단위 멱등키를 공통으로 저장한다.")
+    void shipped_should_use_same_idempotency_key_for_all_lines() {
+        UUID hubId = UUID.randomUUID();
+        UUID productId1 = UUID.randomUUID();
+        UUID productId2 = UUID.randomUUID();
+        List<ShippedStockCommand> commands = List.of(
+                new ShippedStockCommand(hubId, productId1, 5),
+                new ShippedStockCommand(hubId, productId2, 7)
+        );
+
+        given(stockHistoryRepository.saveAll(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+        List<StockHistoryRes> result = stockService.shipped("idem-batch-shipped", commands);
+
+        assertThat(result).hasSize(2);
+        verify(stockHistoryRepository).saveAll(argThat(histories ->
+                histories.size() == 2
+                        && histories.stream().allMatch(history -> "idem-batch-shipped".equals(history.getIdempotencyKey()))
+        ));
         verifyNoInteractions(stockVariationService);
     }
 }

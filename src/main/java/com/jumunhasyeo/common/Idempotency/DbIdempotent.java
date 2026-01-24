@@ -14,4 +14,9 @@ public @interface DbIdempotent {
      * TTL (일 단위)
      */
     int ttlDays() default 7;
+
+    /**
+     * 멱등키 namespace prefix
+     */
+    String keyPrefix() default "";
 }
