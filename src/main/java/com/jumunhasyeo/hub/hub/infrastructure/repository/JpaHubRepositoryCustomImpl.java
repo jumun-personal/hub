@@ -78,7 +78,7 @@ public class JpaHubRepositoryCustomImpl implements JpaHubRepositoryCustom {
 
     private BooleanExpression isActive() {
         QHub hub = QHub.hub;
-        return hub.status.isNull().or(hub.status.eq(HubStatus.ACTIVE));
+        return hub.status.isNull().or(hub.status.eq(HubStatus.COMPLETE));
     }
 
     private BooleanExpression nameContains(String name) {

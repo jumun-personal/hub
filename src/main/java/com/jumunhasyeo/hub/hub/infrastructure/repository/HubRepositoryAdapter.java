@@ -23,7 +23,7 @@ public class HubRepositoryAdapter implements HubRepository {
 
     @Override
     public Optional<Hub> findById(UUID id) {
-        return jpaHubRepository.findById(id, HubStatus.ACTIVE);
+        return jpaHubRepository.findById(id, HubStatus.COMPLETE);
     }
 
     @Override
@@ -38,21 +38,21 @@ public class HubRepositoryAdapter implements HubRepository {
 
     @Override
     public Boolean existById(UUID hubId) {
-        return jpaHubRepository.existsById(hubId, HubStatus.ACTIVE);
+        return jpaHubRepository.existsById(hubId, HubStatus.COMPLETE);
     }
 
     @Override
     public long count() {
-        return jpaHubRepository.count(HubStatus.ACTIVE);
+        return jpaHubRepository.count(HubStatus.COMPLETE);
     }
 
     @Override
     public List<Hub> findAllByHubType(HubType type) {
-        return jpaHubRepository.findAllByHubType(type, HubStatus.ACTIVE);
+        return jpaHubRepository.findAllByHubType(type, HubStatus.COMPLETE);
     }
 
     @Override
     public List<Hub> findAll() {
-        return jpaHubRepository.findAll(HubStatus.ACTIVE);
+        return jpaHubRepository.findAll(HubStatus.COMPLETE);
     }
 }

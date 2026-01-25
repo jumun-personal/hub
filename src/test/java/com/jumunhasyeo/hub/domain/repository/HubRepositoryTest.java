@@ -222,7 +222,7 @@ class HubRepositoryTest extends AbstractJpaRepositoryTest {
     private static Hub createHub() {
         return Hub.builder()
                 .name("송파 허브")
-                .status(HubStatus.ACTIVE)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of("street", Coordinate.of(12.6, 12.6)))
                 .build();
     }
@@ -231,7 +231,7 @@ class HubRepositoryTest extends AbstractJpaRepositoryTest {
         return Hub.builder()
                 .name(name)
                 .hubType(hubType)
-                .status(HubStatus.ACTIVE)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of("주소", Coordinate.of(37.5, 127.0)))
                 .build();
     }

@@ -107,7 +107,7 @@ public class StockVariationServiceImplIntegrationTest extends AbstractIntegratio
     private  Hub createHub() {
         return Hub.builder()
                 .name("송파 허브")
-                .status(HubStatus.ACTIVE)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of("street", Coordinate.of(12.6, 12.6)))
                 .build();
     }

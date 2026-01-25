@@ -125,7 +125,7 @@ class JpaHubRouteRepositoryTest extends AbstractJpaRepositoryTest {
         return Hub.builder()
                 .name(name)
                 .hubType(HubType.CENTER)
-                .status(HubStatus.ACTIVE)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of("주소", Coordinate.of(37.5, 127.0)))
                 .build();
     }

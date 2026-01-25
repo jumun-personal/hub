@@ -178,7 +178,7 @@ class JpaStockRepositoryCustomImplTest extends AbstractJpaRepositoryTest {
     private static Hub createHub(String name, String street, Double lat, Double lon) {
         return Hub.builder()
                 .name(name)
-                .status(HubStatus.ACTIVE)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of(street, Coordinate.of(lat, lon)))
                 .build();
     }
