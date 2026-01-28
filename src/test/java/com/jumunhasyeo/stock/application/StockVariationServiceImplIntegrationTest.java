@@ -8,7 +8,7 @@ import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.domain.entity.Stock;
-import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
@@ -22,7 +22,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class StockVariationServiceImplIntegrationTest extends AbstractIntegrationTest {
+public class StockVariationServiceImplIntegrationTest extends IntegrationTest {
     @Autowired
     private StockVariationServiceImpl stockService;
 

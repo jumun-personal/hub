@@ -2,11 +2,9 @@ package com.jumunhasyeo.product.presentation.controller;
 
 import com.jumunhasyeo.product.application.dto.ProductRes;
 import com.jumunhasyeo.product.domain.entity.Product;
-import com.jumunhasyeo.product.presentation.ProductController;
 import com.jumunhasyeo.product.presentation.dto.req.CreateProductReq;
 import com.jumunhasyeo.product.presentation.dto.req.UpdateProductReq;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
@@ -24,8 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-public class ProductControllerTest extends AbstractControllerWebMvcTest {
+public class ProductControllerTest extends ControllerSliceTest {
 
     @Test
     @DisplayName("상품 생성 API")

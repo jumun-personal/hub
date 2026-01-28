@@ -2,17 +2,14 @@ package com.jumunhasyeo.stock.presentaion;
 
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
-import com.jumunhasyeo.stock.presentation.StockWebController;
-import com.jumunhasyeo.stock.presentation.dto.request.*;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.stock.presentation.dto.request.CreateStockReq;
+import com.jumunhasyeo.stock.presentation.dto.request.DeleteStockReq;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
@@ -22,8 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class StockWebControllerTest extends AbstractControllerWebMvcTest {
+class StockWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("재고 생성 API로 재고 생성을 요청할 수 있다.")
     void create_stock_success() throws Exception {

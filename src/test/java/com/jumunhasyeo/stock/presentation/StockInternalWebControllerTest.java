@@ -2,11 +2,8 @@ package com.jumunhasyeo.stock.presentation;
 
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.presentation.dto.request.DecreaseStockReq;
-import com.jumunhasyeo.stock.presentation.dto.request.DecreaseStockReqList;
 import com.jumunhasyeo.stock.presentation.dto.request.IncrementStockReq;
-import com.jumunhasyeo.stock.presentation.dto.request.IncrementStockReqList;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -21,8 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class StockInternalWebControllerTest extends AbstractControllerWebMvcTest {
+class StockInternalWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("재고 감소 API로 재고 감소를 요청할 수 있다.")
     void decrement_stock_success() throws Exception {

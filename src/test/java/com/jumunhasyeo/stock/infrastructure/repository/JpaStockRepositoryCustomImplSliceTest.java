@@ -8,7 +8,7 @@ import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepository;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepositoryCustom;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class JpaStockRepositoryCustomImplTest extends AbstractJpaRepositoryTest {
+class JpaStockRepositoryCustomImplSliceTest extends RepositorySliceTest {
 
     @Autowired
     private JpaHubRepository hubRepository;

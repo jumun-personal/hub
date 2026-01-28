@@ -8,7 +8,7 @@ import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.repository.JpaHubRouteRepositoryImpl;
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +18,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class JpaHubRouteRepositoryTest extends AbstractJpaRepositoryTest {
+class JpaHubRouteRepositorySliceTest extends RepositorySliceTest {
 
     @Autowired
     private JpaHubRouteRepositoryImpl hubRouteRepository;

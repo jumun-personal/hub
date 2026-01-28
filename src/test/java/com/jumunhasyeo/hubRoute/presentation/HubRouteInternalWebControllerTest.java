@@ -1,9 +1,7 @@
 package com.jumunhasyeo.hubRoute.presentation;
 
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
-import com.jumunhasyeo.hub.hubRoute.presentation.HubRouteInternalWebController;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -16,8 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class HubRouteInternalWebControllerTest extends AbstractControllerWebMvcTest {
+class HubRouteInternalWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("허브 경로 전체 조회 API로 모든 허브 경로를 조회할 수 있다.")
     void get_all_routes_success() throws Exception {

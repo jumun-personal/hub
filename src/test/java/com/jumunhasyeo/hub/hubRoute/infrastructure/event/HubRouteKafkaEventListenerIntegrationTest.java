@@ -7,7 +7,7 @@ import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
-public class HubRouteKafkaEventListenerIntegrationTest extends AbstractEventDispatchIntegrationTest {
+public class HubRouteKafkaEventListenerIntegrationTest extends IntegrationTest {
 
     @Autowired
     private HubRouteKafkaEventListener hubRouteKafkaEventListener;

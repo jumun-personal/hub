@@ -6,7 +6,7 @@ import com.jumunhasyeo.stock.infrastructure.inbox.InboxEvent;
 import com.jumunhasyeo.stock.infrastructure.inbox.InboxService;
 import com.jumunhasyeo.stock.infrastructure.inbox.InboxStatus;
 import com.jumunhasyeo.stock.infrastructure.inbox.JpaInboxRepository;
-import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 
-public class InboxServiceIntegrationTest extends AbstractEventDispatchIntegrationTest {
+public class InboxServiceIntegrationTest extends IntegrationTest {
 
     @Autowired
     private InboxService inboxService;

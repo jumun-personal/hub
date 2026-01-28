@@ -1,9 +1,9 @@
 package com.jumunhasyeo;
 
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.Test;
-import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
 
-class HubProductStockCompanyApplicationTests extends AbstractIntegrationTest {
+class HubProductStockCompanyApplicationTests extends IntegrationTest {
 
     @Test
     void contextLoads() {

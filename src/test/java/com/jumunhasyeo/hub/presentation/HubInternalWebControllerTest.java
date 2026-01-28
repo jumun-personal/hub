@@ -1,9 +1,7 @@
 package com.jumunhasyeo.hub.presentation;
 
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
-import com.jumunhasyeo.hub.hub.presentation.HubInternalWebController;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -12,12 +10,11 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class HubInternalWebControllerTest extends AbstractControllerWebMvcTest {
+class HubInternalWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("허브 존재 여부 확인 - 허브가 존재하는 경우")
     void exist_hub_when_hub_exists() throws Exception {

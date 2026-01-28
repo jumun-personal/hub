@@ -3,12 +3,10 @@ package com.jumunhasyeo.hub.presentation;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
-import com.jumunhasyeo.hub.hub.presentation.HubWebController;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.CreateHubReq;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.DeleteHubReq;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.UpdateHubReq;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,8 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class HubWebControllerTest extends AbstractControllerWebMvcTest {
+class HubWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("허브 생성 API로 허브 생성을 요청할 수 있다.")
     void create_hub_success() throws Exception {

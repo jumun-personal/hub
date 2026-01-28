@@ -7,7 +7,7 @@ import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 
-public class OutboxServiceIntegrationTest extends AbstractEventDispatchIntegrationTest {
+public class OutboxServiceIntegrationTest extends IntegrationTest {
 
     @Autowired
     private OutboxService outboxService;

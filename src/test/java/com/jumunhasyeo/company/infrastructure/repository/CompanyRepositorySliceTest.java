@@ -3,7 +3,7 @@ package com.jumunhasyeo.company.infrastructure.repository;
 import com.jumunhasyeo.company.domain.entity.Company;
 import com.jumunhasyeo.company.domain.entity.CompanyType;
 import com.jumunhasyeo.company.domain.repository.CompanyRepository;
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +14,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class CompanyRepositoryTest extends AbstractJpaRepositoryTest {
+class CompanyRepositorySliceTest extends RepositorySliceTest {
 
     @Autowired
     private CompanyRepository companyRepository;

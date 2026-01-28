@@ -5,7 +5,7 @@ import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.stock.domain.entity.Stock;
-import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class JpaStockRepositoryConcurrencyTest extends AbstractIntegrationTest {
+public class JpaStockRepositoryConcurrencyTest extends IntegrationTest {
 
     @Autowired
     private JpaStockRepository jpaStockRepository;

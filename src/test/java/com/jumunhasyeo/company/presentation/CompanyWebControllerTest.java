@@ -5,8 +5,7 @@ import com.jumunhasyeo.company.domain.entity.CompanyType;
 import com.jumunhasyeo.company.presentation.dto.request.CreateCompanyReq;
 import com.jumunhasyeo.company.presentation.dto.request.DeleteCompanyReq;
 import com.jumunhasyeo.company.presentation.dto.request.UpdateCompanyReq;
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -20,8 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class CompanyWebControllerTest extends AbstractControllerWebMvcTest {
+class CompanyWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("업체를 생성할 수 있다.")
     void create_success() throws Exception {

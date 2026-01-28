@@ -3,7 +3,7 @@ package com.jumunhasyeo.common.Idempotency.db.domain.repository;
 import com.jumunhasyeo.common.Idempotency.db.domain.DbIdempotentKey;
 import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.Idempotency.db.infrastructure.repository.IdempotentKeyRepositoryAdapter;
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +13,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class IdempotencyKeyRepositoryTest extends AbstractJpaRepositoryTest {
+class IdempotencyKeyRepositorySliceTest extends RepositorySliceTest {
 
     @Autowired
     private IdempotentKeyRepositoryAdapter repository;

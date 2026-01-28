@@ -1,10 +1,11 @@
 package com.jumunhasyeo.e2e;
 
+import com.jumunhasyeo.CommonTestContainer;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.CreateHubReq;
-import com.jumunhasyeo.testsupport.AbstractHttpIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +19,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
-public class HubApiIntegrationTest extends AbstractHttpIntegrationTest {
+public class HubApiIntegrationTest extends IntegrationTest {
 
     @LocalServerPort
     private int port;

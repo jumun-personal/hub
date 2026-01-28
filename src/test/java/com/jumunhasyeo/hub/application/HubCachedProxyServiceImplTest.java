@@ -8,7 +8,7 @@ import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Transactional
-class HubRedisCachedDecoratorServiceIntegrationTest extends AbstractIntegrationTest {
+class HubRedisCachedDecoratorServiceIntegrationTest extends IntegrationTest {
 
     @Autowired
     private HubService hubService;

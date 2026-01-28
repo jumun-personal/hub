@@ -1,7 +1,6 @@
 package com.jumunhasyeo.company.presentation;
 
-import com.jumunhasyeo.testsupport.AbstractControllerWebMvcTest;
-import com.jumunhasyeo.testsupport.UnifiedControllerSliceTest;
+import com.jumunhasyeo.testsupport.ControllerSliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -12,8 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@UnifiedControllerSliceTest
-class CompanyInternalWebControllerTest extends AbstractControllerWebMvcTest {
+class CompanyInternalWebControllerTest extends ControllerSliceTest {
     @Test
     @DisplayName("업체 존재 여부를 검증할 수 있다 - 존재하는 경우")
     void exists_true() throws Exception {

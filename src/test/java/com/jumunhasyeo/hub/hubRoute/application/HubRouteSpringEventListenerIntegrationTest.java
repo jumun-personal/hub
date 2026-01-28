@@ -11,7 +11,7 @@ import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
-import com.jumunhasyeo.testsupport.AbstractIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +22,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class HubRouteSpringEventListenerIntegrationTest extends AbstractIntegrationTest {
+public class HubRouteSpringEventListenerIntegrationTest extends IntegrationTest {
 
     @Autowired
     private HubRouteSpringEventListener hubRouteSpringEventListener;

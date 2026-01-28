@@ -8,7 +8,7 @@ import com.jumunhasyeo.product.domain.vo.Price;
 import com.jumunhasyeo.product.domain.vo.ProductDescription;
 import com.jumunhasyeo.product.domain.vo.ProductName;
 import com.jumunhasyeo.product.presentation.dto.req.ProductSearchCondition;
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ import java.util.UUID;
 import static com.jumunhasyeo.product.fixtures.ProductFixture.getProduct;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class ProductRepositoryTest extends AbstractJpaRepositoryTest {
+public class ProductRepositorySliceTest extends RepositorySliceTest {
 
     @Autowired
     private JpaProductRepository jpaProductRepository;

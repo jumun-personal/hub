@@ -1,7 +1,7 @@
 package com.jumunhasyeo.stock.infrastructure.repository;
 
 import com.jumunhasyeo.stock.domain.entity.StockHistory;
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +11,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class JpaStockHistoryRepositoryTest extends AbstractJpaRepositoryTest {
+class JpaStockHistoryRepositorySliceTest extends RepositorySliceTest {
 
     @Autowired
     private JpaStockHistoryRepository jpaStockHistoryRepository;

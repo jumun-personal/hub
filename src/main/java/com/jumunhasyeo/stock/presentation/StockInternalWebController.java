@@ -57,19 +57,12 @@ public class StockInternalWebController {
             @Parameter(description = "재고 감소 요청 정보", required = true)
             @RequestBody @Valid List<DecreaseStockReq> productList
     ) {
-        for (DecreaseStockReq decreaseStockReq : productList) {
-            log.info("decrement INPUT -------------------- {}",String.valueOf(decreaseStockReq.productId()));
-        }
-
         List<DecreaseStockCommand> commandList = productList
                 .stream()
                 .map(descStockReq -> new DecreaseStockCommand(descStockReq.productId(), descStockReq.quantity()))
                 .toList();
 
         List<StockRes> stockRes = stockService.decrement(idempotencyKey, commandList);
-        for (StockRes stock : stockRes) {
-            log.info("decrement OUTPUT -------------------- PID: {}, QUNTITY : {}",stock.productId(),stock.quantity());
-        }
         return ResponseEntity.ok(ApiRes.success(true));
     }
 

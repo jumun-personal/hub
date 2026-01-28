@@ -1,6 +1,6 @@
 package com.jumunhasyeo.hub.infrastructure.outbox;
 
-import com.jumunhasyeo.testsupport.AbstractJpaRepositoryTest;
+import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +11,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class JpaOutboxRepositoryTest extends AbstractJpaRepositoryTest {
+class JpaOutboxRepositorySliceTest extends RepositorySliceTest {
 
     @Autowired
     private JpaOutboxRepository jpaOutboxRepository;

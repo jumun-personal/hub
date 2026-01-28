@@ -1,7 +1,7 @@
 package com.jumunhasyeo.stock.infrastructure.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.testsupport.AbstractEventDispatchIntegrationTest;
+import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +13,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
-public class KafkaStockEventListenerIntegrationTest extends AbstractEventDispatchIntegrationTest {
+public class KafkaStockEventListenerIntegrationTest extends IntegrationTest {
 
     @Autowired
     private KafkaStockEventListener kafkaStockEventListener;
