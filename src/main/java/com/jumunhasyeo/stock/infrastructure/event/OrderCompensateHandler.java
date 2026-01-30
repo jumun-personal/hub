@@ -9,7 +9,6 @@ import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.infrastructure.inbox.InboxService;
-import com.jumunhasyeo.stock.application.StockService;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +24,7 @@ import static com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus.SUCC
 @RequiredArgsConstructor
 @Slf4j
 public class OrderCompensateHandler {
-    private final StockService stockService;
+    private final KafkaStockCompensationService kafkaStockCompensationService;
     private final DbIdempotentService dbIdempotentService;
     private final InboxService inboxService;
     private final ObjectMapper objectMapper;
@@ -49,7 +48,7 @@ public class OrderCompensateHandler {
 
         if (SUCCESS.equals(status)) {
             List<IncreaseStockCommand> payload = getPayload(dbIdempotentKey);
-            stockService.increment(dbIdempotentKey.genCancelKey(), payload);
+            kafkaStockCompensationService.incrementCompensation(dbIdempotentKey.genCancelKey(), payload);
             return;
         }
 

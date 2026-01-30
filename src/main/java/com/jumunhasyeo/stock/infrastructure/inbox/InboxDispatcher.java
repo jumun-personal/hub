@@ -7,8 +7,8 @@ import com.jumunhasyeo.common.Idempotency.db.application.DbIdempotentService;
 import com.jumunhasyeo.common.Idempotency.db.domain.DbIdempotentKey;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.stock.application.StockService;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
+import com.jumunhasyeo.stock.infrastructure.event.KafkaStockCompensationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORD
 public class InboxDispatcher {
 
     private final DbIdempotentService dbIdempotentService;
-    private final StockService stockService;
+    private final KafkaStockCompensationService kafkaStockCompensationService;
     private final ObjectMapper objectMapper;
 
     public void dispatch(InboxEvent event) {
@@ -48,9 +48,9 @@ public class InboxDispatcher {
 
             // 이벤트 타입에 따라 처리
             if (event.getEventName().equals(ORDER_CANCEL_EVENT.getEventName())) {
-                stockService.increment(dbIdempotentKey.genCancelKey(), getPayload(dbIdempotentKey));
+                kafkaStockCompensationService.incrementCompensation(dbIdempotentKey.genCancelKey(), getPayload(dbIdempotentKey));
             } else if (event.getEventName().equals(ORDER_ROLLED_BACK_EVENT.getEventName())){
-                stockService.increment(dbIdempotentKey.genCancelKey(), getPayload(dbIdempotentKey));
+                kafkaStockCompensationService.incrementCompensation(dbIdempotentKey.genCancelKey(), getPayload(dbIdempotentKey));
             } else {
                 throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 Inbox 이벤트 타입입니다. type=" + event.getEventName());
             }

@@ -33,11 +33,6 @@ public class InboxService {
     private final ObjectMapper objectMapper;
 
     public void save(OrderCompensationEvent event) throws JsonProcessingException {
-        if (inboxRepository.existsByEventKey(event.getKey())) {
-            log.info("Inbox event already exists. skip save. eventKey={}", event.getKey());
-            return;
-        }
-
         InboxEvent inboxEvent = InboxEvent.builder()
                 .eventKey(event.getKey())
                 .eventName(resolveEventName(event))
@@ -45,7 +40,10 @@ public class InboxService {
                 .status(InboxStatus.RECEIVED)
                 .receivedAt(LocalDateTime.now())
                 .build();
-        inboxRepository.save(inboxEvent);
+        boolean saved = inboxRepository.saveIfAbsent(inboxEvent);
+        if (!saved) {
+            log.info("Inbox event already exists. skip save. eventKey={}", event.getKey());
+        }
     }
 
     public List<InboxEvent> findByStatusAndModifiedAtBefore(InboxStatus inboxStatus, LocalDateTime threshold) {
