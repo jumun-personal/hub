@@ -1,5 +1,7 @@
 package com.jumunhasyeo.stock.presentation;
 
+import com.jumunhasyeo.common.exception.BusinessException;
+import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.presentation.dto.request.DecreaseStockReq;
 import com.jumunhasyeo.stock.presentation.dto.request.IncrementStockReq;
@@ -75,5 +77,22 @@ class StockInternalWebControllerTest extends ControllerSliceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value("true"))
                 .andReturn();
+    }
+
+    @Test
+    @DisplayName("재고 증가 중복 성공 충돌은 기존처럼 409를 반환한다.")
+    void increment_stock_whenSuccessConflict_returns409() throws Exception {
+        ArrayList<IncrementStockReq> request = new ArrayList<>();
+        request.add(new IncrementStockReq(UUID.randomUUID(), 100));
+        given(stockService.increment(any(), any()))
+                .willThrow(new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION));
+
+        mockMvc.perform(post("/internal/api/v1/stocks/increment")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(ErrorCode.SUCCESS_CONFLICT_EXCEPTION.getCode()))
+                .andExpect(jsonPath("$.message").value(ErrorCode.SUCCESS_CONFLICT_EXCEPTION.getMessage()));
     }
 }

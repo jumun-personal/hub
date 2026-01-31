@@ -6,6 +6,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -15,7 +16,9 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
@@ -66,30 +69,36 @@ public class KafkaConfig {
 
     @Bean
     public DefaultErrorHandler defaultErrorHandler(KafkaTemplate<String, String> kafkaTemplate) {
-        ExponentialBackOffWithMaxRetries backOff = new ExponentialBackOffWithMaxRetries(2);
-        backOff.setInitialInterval(500L);
-        backOff.setMultiplier(2.0);
-        backOff.setMaxInterval(2000L);
+        return buildDefaultErrorHandler(deadLetterPublishingRecoverer(kafkaTemplate));
+    }
 
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
-                kafkaTemplate,
-                (record, ex) -> new TopicPartition(record.topic() + ".DLQ", record.partition())
-        );
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
-        errorHandler.addNotRetryableExceptions(JsonProcessingException.class);
-        return errorHandler;
+    @Bean
+    public DefaultErrorHandler stockKafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate) {
+        return buildDefaultErrorHandler(deadLetterPublishingRecoverer(kafkaTemplate));
     }
 
     @Bean(name = "kafkaListenerContainerFactory")
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,
-            DefaultErrorHandler defaultErrorHandler
+            @Qualifier("defaultErrorHandler") DefaultErrorHandler defaultErrorHandler
     ) {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory);
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
-        factory.setCommonErrorHandler(defaultErrorHandler);
-        return factory;
+        return buildListenerContainerFactory(
+                consumerFactory,
+                defaultErrorHandler,
+                ContainerProperties.AckMode.RECORD
+        );
+    }
+
+    @Bean(name = "stockKafkaListenerContainerFactory")
+    public ConcurrentKafkaListenerContainerFactory<String, String> stockKafkaListenerContainerFactory(
+            ConsumerFactory<String, String> consumerFactory,
+            @Qualifier("stockKafkaErrorHandler") DefaultErrorHandler stockKafkaErrorHandler
+    ) {
+        return buildListenerContainerFactory(
+                consumerFactory,
+                stockKafkaErrorHandler,
+                ContainerProperties.AckMode.BATCH
+        );
     }
 
     @Bean(name = "hubRouteKafkaListenerContainerFactory")
@@ -97,10 +106,43 @@ public class KafkaConfig {
             ConsumerFactory<String, String> consumerFactory,
             HubRouteDlqRecoverer hubRouteDlqRecoverer
     ) {
+        return buildListenerContainerFactory(
+                consumerFactory,
+                hubRouteDlqRecoverer.buildErrorHandler(),
+                ContainerProperties.AckMode.RECORD
+        );
+    }
+
+    private ConcurrentKafkaListenerContainerFactory<String, String> buildListenerContainerFactory(
+            ConsumerFactory<String, String> consumerFactory,
+            CommonErrorHandler errorHandler,
+            ContainerProperties.AckMode ackMode
+    ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
-        factory.setCommonErrorHandler(hubRouteDlqRecoverer.buildErrorHandler());
+        factory.getContainerProperties().setAckMode(ackMode);
+        factory.setCommonErrorHandler(errorHandler);
         return factory;
+    }
+
+    private DefaultErrorHandler buildDefaultErrorHandler(ConsumerRecordRecoverer recoverer) {
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, kafkaBackOff());
+        errorHandler.addNotRetryableExceptions(JsonProcessingException.class);
+        return errorHandler;
+    }
+
+    private DeadLetterPublishingRecoverer deadLetterPublishingRecoverer(KafkaTemplate<String, String> kafkaTemplate) {
+        return new DeadLetterPublishingRecoverer(
+                kafkaTemplate,
+                (record, ex) -> new TopicPartition(record.topic() + ".DLQ", record.partition())
+        );
+    }
+
+    private ExponentialBackOffWithMaxRetries kafkaBackOff() {
+        ExponentialBackOffWithMaxRetries backOff = new ExponentialBackOffWithMaxRetries(2);
+        backOff.setInitialInterval(500L);
+        backOff.setMultiplier(2.0);
+        backOff.setMaxInterval(2000L);
+        return backOff;
     }
 }

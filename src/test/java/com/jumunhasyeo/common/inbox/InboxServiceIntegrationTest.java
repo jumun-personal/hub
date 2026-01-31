@@ -47,6 +47,20 @@ public class InboxServiceIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("동일 eventKey 저장은 한 번만 유지되고 중복은 no-op 처리된다.")
+    void save_duplicateEventKey_noop() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        OrderCancelEvent event = new OrderCancelEvent(orderId, "", LocalDateTime.now());
+
+        inboxService.save(event);
+        inboxService.save(event);
+
+        List<InboxEvent> events = jpaInboxRepository.findAll();
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).getEventKey()).isEqualTo(orderId.toString());
+    }
+
+    @Test
     @DisplayName("PROCESSING 상태의 이벤트를 조회할 수 있다.")
     void findByStatusAndModifiedAtBefore_integration_success() {
         //given

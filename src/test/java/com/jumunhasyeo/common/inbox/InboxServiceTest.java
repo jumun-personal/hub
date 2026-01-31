@@ -46,15 +46,15 @@ public class InboxServiceTest {
         //given
         OrderCancelEvent event = new OrderCancelEvent(UUID.randomUUID(), "", LocalDateTime.now());
         String expectedJson = "{\"key\":\"test-key\"}";
-        given(inboxRepository.existsByEventKey(event.getKey())).willReturn(false);
         given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
+        given(inboxRepository.saveIfAbsent(any(InboxEvent.class))).willReturn(true);
 
         //when
         inboxService.save(event);
 
         //then
         ArgumentCaptor<InboxEvent> captor = ArgumentCaptor.forClass(InboxEvent.class);
-        then(inboxRepository).should().save(captor.capture());
+        then(inboxRepository).should().saveIfAbsent(captor.capture());
 
         InboxEvent savedEvent = captor.getValue();
         assertThat(savedEvent.getEventKey()).isEqualTo(event.getKey());
@@ -69,15 +69,15 @@ public class InboxServiceTest {
         //given
         OrderRolledBackEvent event = new OrderRolledBackEvent(UUID.randomUUID(), "ROLLED_BACK", LocalDateTime.now());
         String expectedJson = "{\"key\":\"test-key\"}";
-        given(inboxRepository.existsByEventKey(event.getKey())).willReturn(false);
         given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
+        given(inboxRepository.saveIfAbsent(any(InboxEvent.class))).willReturn(true);
 
         //when
         inboxService.save(event);
 
         //then
         ArgumentCaptor<InboxEvent> captor = ArgumentCaptor.forClass(InboxEvent.class);
-        then(inboxRepository).should().save(captor.capture());
+        then(inboxRepository).should().saveIfAbsent(captor.capture());
 
         InboxEvent savedEvent = captor.getValue();
         assertThat(savedEvent.getEventKey()).isEqualTo(event.getKey());
@@ -90,12 +90,14 @@ public class InboxServiceTest {
     @DisplayName("동일 eventKey가 있으면 Inbox 저장을 건너뛴다.")
     void save_WhenEventKeyAlreadyExists_skip() throws Exception {
         OrderCancelEvent event = new OrderCancelEvent(UUID.randomUUID(), "", LocalDateTime.now());
-        given(inboxRepository.existsByEventKey(event.getKey())).willReturn(true);
+        given(objectMapper.writeValueAsString(event)).willReturn("{\"key\":\"test-key\"}");
+        given(inboxRepository.saveIfAbsent(any(InboxEvent.class))).willReturn(false);
 
         inboxService.save(event);
 
         then(inboxRepository).should(never()).save(any());
-        then(objectMapper).should(never()).writeValueAsString(any());
+        then(inboxRepository).should().saveIfAbsent(any(InboxEvent.class));
+        then(objectMapper).should().writeValueAsString(event);
     }
 
     @Test
@@ -166,6 +168,21 @@ public class InboxServiceTest {
         assertThat(event.getRetryCount()).isEqualTo(1);
         assertThat(event.getErrorMessage()).isEqualTo("Dispatch error");
         assertThat(event.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("PROCESSING_CONFLICT_EXCEPTION은 재시도 가능한 실패로 처리된다.")
+    void inboxProcess_WhenProcessingConflict_dispatchFailForRetry() {
+        InboxEvent event = createInboxEvent();
+        doThrow(new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION))
+                .when(inboxDispatcher).dispatch(event);
+
+        inboxService.inboxProcess(event);
+
+        then(inboxRepository).should(times(2)).save(event);
+        assertThat(event.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+        assertThat(event.getRetryCount()).isEqualTo(1);
+        assertThat(event.getErrorMessage()).contains(ErrorCode.PROCESSING_CONFLICT_EXCEPTION.getMessage());
     }
 
     @Test

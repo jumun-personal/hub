@@ -5,6 +5,7 @@ import java.util.List;
 
 public interface InboxRepository {
     void save(InboxEvent inboxEvent);
+    boolean saveIfAbsent(InboxEvent inboxEvent);
     List<InboxEvent> findByStatusAndModifiedAtBefore(InboxStatus inboxStatus, LocalDateTime threshold);
     boolean existsByEventKey(String eventKey);
 }

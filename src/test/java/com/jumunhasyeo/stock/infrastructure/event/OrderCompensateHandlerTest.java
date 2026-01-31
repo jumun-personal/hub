@@ -8,13 +8,12 @@ import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentType;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.stock.application.StockService;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import com.jumunhasyeo.stock.infrastructure.inbox.InboxService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -33,7 +33,7 @@ import static org.mockito.Mockito.never;
 class OrderCompensateHandlerTest {
 
     @Mock
-    private StockService stockService;
+    private com.jumunhasyeo.stock.application.StockService stockService;
 
     @Mock
     private DbIdempotentService dbIdempotentService;
@@ -44,8 +44,20 @@ class OrderCompensateHandlerTest {
     @Mock
     private ObjectMapper objectMapper;
 
-    @InjectMocks
+    private KafkaStockCompensationService kafkaStockCompensationService;
+
     private OrderCompensateHandler orderCompensateHandler;
+
+    @BeforeEach
+    void setUp() {
+        kafkaStockCompensationService = new KafkaStockCompensationService(stockService);
+        orderCompensateHandler = new OrderCompensateHandler(
+                kafkaStockCompensationService,
+                dbIdempotentService,
+                inboxService,
+                objectMapper
+        );
+    }
 
     @Test
     @DisplayName("idempotent key가 없으면 inbox에 적재한다")
@@ -84,6 +96,26 @@ class OrderCompensateHandlerTest {
         given(objectMapper.readValue(eq(payloadJson), any(TypeReference.class))).willReturn(payload);
 
         orderCompensateHandler.compensate(event);
+
+        then(stockService).should().increment(eq(key.genCancelKey()), eq(payload));
+        then(inboxService).should(never()).save(any());
+    }
+
+    @Test
+    @DisplayName("보상 increment가 이미 성공한 중복이면 예외 없이 no-op 처리한다")
+    void compensate_whenSuccessConflict_ignoreDuplicateSuccess() throws Exception {
+        OrderCancelEvent event = new OrderCancelEvent(UUID.randomUUID(), "", LocalDateTime.now());
+        String payloadJson = "[{\"productId\":\"550e8400-e29b-41d4-a716-446655440000\",\"amount\":3}]";
+        DbIdempotentKey key = dbKey(event.getKey(), IdempotentStatus.SUCCESS, payloadJson);
+        List<IncreaseStockCommand> payload = List.of(new IncreaseStockCommand(UUID.randomUUID(), 3));
+
+        given(dbIdempotentService.get(event.getKey())).willReturn(key);
+        given(objectMapper.readValue(eq(payloadJson), any(TypeReference.class))).willReturn(payload);
+        given(stockService.increment(key.genCancelKey(), payload))
+                .willThrow(new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION));
+
+        assertThatCode(() -> orderCompensateHandler.compensate(event))
+                .doesNotThrowAnyException();
 
         then(stockService).should().increment(eq(key.genCancelKey()), eq(payload));
         then(inboxService).should(never()).save(any());

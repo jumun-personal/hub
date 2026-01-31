@@ -25,7 +25,7 @@ public class KafkaStockEventListener {
     @KafkaListener(
             topics = "${spring.kafka.topics.order}",
             groupId = "${spring.kafka.consumer.stock}",
-            containerFactory = "kafkaListenerContainerFactory"
+            containerFactory = "stockKafkaListenerContainerFactory"
     )
     public void listen(
             @Payload String payload,
