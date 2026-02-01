@@ -23,8 +23,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -52,10 +54,12 @@ public class HubRouteService {
             hubRoutes.addAll(buildForBranch(command));
         }
 
-        List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
-                .map(HubRouteCreatedEvent::from)
-                .collect(Collectors.toList());
-        hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
+        if (!hubRoutes.isEmpty()) {
+            List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
+                    .map(HubRouteCreatedEvent::from)
+                    .collect(Collectors.toList());
+            hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
+        }
         hubRouteEventPublisher.publishRouteBuildCompleted(command);
     }
 
@@ -68,16 +72,18 @@ public class HubRouteService {
                 .stream()
                 .filter(hub -> !hub.getHubId().equals(newCenterHub.getHubId()))  // 자기 자신 제외
                 .collect(Collectors.toList());
-        
+        Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(newCenterHub);
+
         // Domain Service에 Route 생성 로직 위임
         Set<HubRoute> routes = hubRouteDomainService.buildRoutesForNewCenterHub(
             newCenterHub, 
             existingCenterHubs,
-            this::calculateRouteWeight
+            (from, to) -> resolveRouteWeight(from, to, existingRouteMap)
         );
+        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
 
-        hubRouteRepository.insertIgnore(routes);
-        return routes;
+        hubRouteRepository.insertIgnore(filteredRoutes);
+        return filteredRoutes;
     }
 
     /**
@@ -86,15 +92,17 @@ public class HubRouteService {
     private Set<HubRoute> buildForBranch(BuildRouteCommand command) {
         Hub branchHub = getHubIncludingCreating(command.hubId());
         Hub centerHub = getHub(command.centerHubId());
-        
+        Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(branchHub);
+
         Set<HubRoute> routes = hubRouteDomainService.buildRoutesForNewBranchHub(
             branchHub,
             centerHub,
-            this::calculateRouteWeight
+            (from, to) -> resolveRouteWeight(from, to, existingRouteMap)
         );
+        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
 
-        hubRouteRepository.insertIgnore(routes);
-        return routes;
+        hubRouteRepository.insertIgnore(filteredRoutes);
+        return filteredRoutes;
     }
 
     /**
@@ -110,6 +118,36 @@ public class HubRouteService {
         );
         RouteWeightResult response = routeWeightApi.getRouteInfo(query);
         return RouteWeight.of(response.distanceKm(), response.durationMinutes());
+    }
+
+    private RouteWeight resolveRouteWeight(Hub from, Hub to, Map<RouteKey, HubRoute> existingRouteMap) {
+        HubRoute existing = existingRouteMap.get(routeKey(from, to));
+        if (existing != null) {
+            return existing.getRouteWeight();
+        }
+
+        HubRoute reverse = existingRouteMap.get(routeKey(to, from));
+        if (reverse != null) {
+            return reverse.getRouteWeight();
+        }
+
+        return calculateRouteWeight(from, to);
+    }
+
+    private Map<RouteKey, HubRoute> getExistingRouteMap(Hub hub) {
+        return hubRouteRepository.findByStartHubOrEndHub(hub, hub).stream()
+                .collect(Collectors.toMap(
+                        route -> routeKey(route.getStartHub(), route.getEndHub()),
+                        route -> route,
+                        (existing, ignored) -> existing,
+                        HashMap::new
+                ));
+    }
+
+    private Set<HubRoute> filterMissingRoutes(Set<HubRoute> routes, Map<RouteKey, HubRoute> existingRouteMap) {
+        return routes.stream()
+                .filter(route -> !existingRouteMap.containsKey(routeKey(route.getStartHub(), route.getEndHub())))
+                .collect(Collectors.toCollection(HashSet::new));
     }
 
     private Hub getHub(UUID hubId) {
@@ -167,5 +205,12 @@ public class HubRouteService {
                 .stream()
                 .map(HubRouteRes::from)
                 .collect(Collectors.toList());
+    }
+
+    private RouteKey routeKey(Hub startHub, Hub endHub) {
+        return new RouteKey(startHub.getHubId(), endHub.getHubId());
+    }
+
+    private record RouteKey(UUID startHubId, UUID endHubId) {
     }
 }

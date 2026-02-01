@@ -7,6 +7,8 @@ import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
+import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
+import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
@@ -18,8 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatcher;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,6 +35,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,12 +50,10 @@ class HubRouteServiceTest {
     @Mock
     private HubRouteRepository hubRouteRepository;
     @Mock
-    private HubRouteDomainService hubRouteDomainService;
-    @Mock
     private HubRouteEventPublisher hubRouteEventPublisher;
 
-    @InjectMocks
     private HubRouteService hubRouteService;
+    private HubRouteDomainService hubRouteDomainService;
 
     private Hub center1;
     private Hub center2;
@@ -60,6 +61,14 @@ class HubRouteServiceTest {
 
     @BeforeEach
     void setUp() {
+        hubRouteDomainService = new HubRouteDomainService();
+        hubRouteService = new HubRouteService(
+                hubRepository,
+                routeWeightApi,
+                hubRouteRepository,
+                hubRouteDomainService,
+                hubRouteEventPublisher
+        );
         center1 = hub(UUID.randomUUID(), "센터1", HubType.CENTER, 37.5, 127.0);
         center2 = hub(UUID.randomUUID(), "센터2", HubType.CENTER, 35.8, 128.6);
         branch = hub(UUID.randomUUID(), "지점1", HubType.BRANCH, 37.4, 127.1);
@@ -72,13 +81,14 @@ class HubRouteServiceTest {
         BuildRouteCommand command = new BuildRouteCommand(null, center1.getHubId(), center1.getName(), center1.getAddress(), HubType.CENTER);
         when(hubRepository.findByIdIncludingCreating(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRepository.findAllByHubType(HubType.CENTER)).thenReturn(List.of(center1, center2));
-
-        Set<HubRoute> routes = HubRoute.createTwoWay(center2, center1, RouteWeight.of(BigDecimal.valueOf(11.9), 32));
-        when(hubRouteDomainService.buildRoutesForNewCenterHub(any(), any(), any())).thenReturn(routes);
+        when(hubRouteRepository.findByStartHubOrEndHub(center1, center1)).thenReturn(List.of());
+        when(routeWeightApi.getRouteInfo(any()))
+                .thenReturn(routeWeightResult(11.9, 32));
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(hubRouteRepository).insertIgnore(routes);
+        verify(routeWeightApi).getRouteInfo(any());
+        verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
         ArgumentCaptor<List<HubRouteCreatedEvent>> captor = ArgumentCaptor.forClass(List.class);
         verify(hubRouteEventPublisher).publishRouteCreatedEvent(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
@@ -90,14 +100,89 @@ class HubRouteServiceTest {
         BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
         when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
         when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
-
-        Set<HubRoute> routes = HubRoute.createTwoWay(branch, center1, RouteWeight.of(BigDecimal.valueOf(7.2), 19));
-        when(hubRouteDomainService.buildRoutesForNewBranchHub(any(), any(), any())).thenReturn(routes);
+        when(hubRouteRepository.findByStartHubOrEndHub(branch, branch)).thenReturn(List.of());
+        when(routeWeightApi.getRouteInfo(any()))
+                .thenReturn(routeWeightResult(7.2, 19));
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(hubRouteRepository).insertIgnore(routes);
+        verify(routeWeightApi).getRouteInfo(any());
+        verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
         verify(hubRouteEventPublisher).publishRouteCreatedEvent(any());
+    }
+
+    @Test
+    @DisplayName("CENTER 허브 생성 시 기존 양방향 경로가 모두 있으면 외부 API와 created 이벤트를 생략한다.")
+    void build_routes_for_center_skipsExistingTwoWayRoutes() {
+        BuildRouteCommand command = new BuildRouteCommand(null, center1.getHubId(), center1.getName(), center1.getAddress(), HubType.CENTER);
+        when(hubRepository.findByIdIncludingCreating(center1.getHubId())).thenReturn(Optional.of(center1));
+        when(hubRepository.findAllByHubType(HubType.CENTER)).thenReturn(List.of(center1, center2));
+        when(hubRouteRepository.findByStartHubOrEndHub(center1, center1))
+                .thenReturn(List.of(
+                        HubRoute.ofSelfId(UUID.randomUUID(), center1, center2, RouteWeight.of(BigDecimal.valueOf(11.9), 32)),
+                        HubRoute.ofSelfId(UUID.randomUUID(), center2, center1, RouteWeight.of(BigDecimal.valueOf(11.9), 32))
+                ));
+
+        hubRouteService.buildRoutesForNewHub(command);
+
+        verify(routeWeightApi, never()).getRouteInfo(any());
+        verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher).publishRouteBuildCompleted(command);
+    }
+
+    @Test
+    @DisplayName("BRANCH 허브 생성 시 기존 양방향 경로가 모두 있으면 외부 API와 created 이벤트를 생략한다.")
+    void build_routes_for_branch_skipsExistingTwoWayRoutes() {
+        BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
+        when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
+        when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
+        when(hubRouteRepository.findByStartHubOrEndHub(branch, branch))
+                .thenReturn(List.of(
+                        HubRoute.ofSelfId(UUID.randomUUID(), branch, center1, RouteWeight.of(BigDecimal.valueOf(7.2), 19)),
+                        HubRoute.ofSelfId(UUID.randomUUID(), center1, branch, RouteWeight.of(BigDecimal.valueOf(7.2), 19))
+                ));
+
+        hubRouteService.buildRoutesForNewHub(command);
+
+        verify(routeWeightApi, never()).getRouteInfo(any());
+        verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher).publishRouteBuildCompleted(command);
+    }
+
+    @Test
+    @DisplayName("CENTER 허브 생성 시 한쪽 방향만 있으면 누락된 방향만 복구한다.")
+    void build_routes_for_center_recoversMissingDirectionWithoutApiCall() {
+        BuildRouteCommand command = new BuildRouteCommand(null, center1.getHubId(), center1.getName(), center1.getAddress(), HubType.CENTER);
+        HubRoute existingRoute = HubRoute.ofSelfId(UUID.randomUUID(), center1, center2, RouteWeight.of(BigDecimal.valueOf(11.9), 32));
+        when(hubRepository.findByIdIncludingCreating(center1.getHubId())).thenReturn(Optional.of(center1));
+        when(hubRepository.findAllByHubType(HubType.CENTER)).thenReturn(List.of(center1, center2));
+        when(hubRouteRepository.findByStartHubOrEndHub(center1, center1)).thenReturn(List.of(existingRoute));
+
+        hubRouteService.buildRoutesForNewHub(command);
+
+        verify(routeWeightApi, never()).getRouteInfo(any());
+        verify(hubRouteRepository).insertIgnore(argThat(routes ->
+                routes.size() == 1 && containsRoute(routes, center2, center1)));
+        verify(hubRouteEventPublisher).publishRouteCreatedEvent(argThat(events -> events.size() == 1));
+    }
+
+    @Test
+    @DisplayName("BRANCH 허브 생성 시 한쪽 방향만 있으면 누락된 방향만 복구한다.")
+    void build_routes_for_branch_recoversMissingDirectionWithoutApiCall() {
+        BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
+        HubRoute existingRoute = HubRoute.ofSelfId(UUID.randomUUID(), branch, center1, RouteWeight.of(BigDecimal.valueOf(7.2), 19));
+        when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
+        when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
+        when(hubRouteRepository.findByStartHubOrEndHub(branch, branch)).thenReturn(List.of(existingRoute));
+
+        hubRouteService.buildRoutesForNewHub(command);
+
+        verify(routeWeightApi, never()).getRouteInfo(any());
+        verify(hubRouteRepository).insertIgnore(argThat(routes ->
+                routes.size() == 1 && containsRoute(routes, center1, branch)));
+        verify(hubRouteEventPublisher).publishRouteCreatedEvent(argThat(events -> events.size() == 1));
     }
 
     @Test
@@ -164,5 +249,23 @@ class HubRouteServiceTest {
                 .centerHubRelations(new HashSet<>())
                 .branchHubRelations(new HashSet<>())
                 .build();
+    }
+
+    private ArgumentMatcher<Set<HubRoute>> hasRouteCount(int expectedSize) {
+        return routes -> routes != null && routes.size() == expectedSize;
+    }
+
+    private boolean containsRoute(Set<HubRoute> routes, Hub startHub, Hub endHub) {
+        return routes.stream()
+                .anyMatch(route -> route.getStartHub().equals(startHub) && route.getEndHub().equals(endHub));
+    }
+
+    private RouteWeightResult routeWeightResult(double distanceKm, int durationMinutes) {
+        return new RouteWeightResult(
+                BigDecimal.valueOf(distanceKm),
+                durationMinutes,
+                MapProvider.UNKNOWN,
+                false
+        );
     }
 }
