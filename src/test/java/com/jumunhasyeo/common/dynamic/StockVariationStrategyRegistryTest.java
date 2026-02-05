@@ -79,6 +79,13 @@ class StockVariationStrategyRegistryTest {
         }
 
         @Override
+        public List<StockRes> decrement(List<DecreaseStockCommand> commands) {
+            return commands.stream()
+                    .map(this::decrement)
+                    .toList();
+        }
+
+        @Override
         public StockRes increment(IncreaseStockCommand command) {
             return new StockRes(UUID.randomUUID(), UUID.randomUUID(), command.productId(), 0, null, null);
         }

@@ -54,17 +54,11 @@ public class StockService {
 
     //상품 재고 감소
     @DbIdempotent(ttlDays = 1)
-    @Transactional
     public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commandList){
-        List<StockRes> result = new ArrayList<>();
-
         List<DecreaseStockCommand> sortedList = new ArrayList<>(commandList);
         sortedList.sort(Comparator.comparing(DecreaseStockCommand::productId));
 
-        for (DecreaseStockCommand command : sortedList) {
-            result.add(stockVariationService.decrement(command));
-        }
-        return result;
+        return stockVariationService.decrement(sortedList);
     }
 
     //상품 재고 증가

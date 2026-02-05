@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -40,6 +42,14 @@ public class StockVariationServiceImpl implements StockVariationService {
         StockRes res = StockRes.from(stock);
         stockRepository.decreaseStock(stock.getStockId(), command.amount());
         return res;
+    }
+
+    @Override
+    @Transactional
+    public List<StockRes> decrement(List<DecreaseStockCommand> commands) {
+        return commands.stream()
+                .map(this::decrement)
+                .toList();
     }
 
     @Override

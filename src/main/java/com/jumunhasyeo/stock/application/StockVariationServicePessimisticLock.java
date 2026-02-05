@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -35,6 +36,14 @@ public class StockVariationServicePessimisticLock implements StockVariationServi
         Stock stock = getStockByPessimisticLock(command.productId());
         stock.decrease(command.amount());
         return StockRes.from(stock);
+    }
+
+    @Override
+    @Transactional
+    public List<StockRes> decrement(List<DecreaseStockCommand> commands) {
+        return commands.stream()
+                .map(this::decrement)
+                .toList();
     }
 
     @Override

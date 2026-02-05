@@ -9,6 +9,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * 동적 StockVariationService 프록시
  * 
@@ -51,6 +53,11 @@ public class DynamicStockVariationServiceProxy implements StockVariationService 
     @Override
     public StockRes decrement(DecreaseStockCommand command) {
         return resolve().decrement(command);
+    }
+
+    @Override
+    public List<StockRes> decrement(List<DecreaseStockCommand> commands) {
+        return resolve().decrement(commands);
     }
     
     @Override
