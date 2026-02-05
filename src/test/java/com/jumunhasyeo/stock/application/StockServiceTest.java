@@ -241,16 +241,13 @@ class StockServiceTest {
         StockRes r2 = StockRes.from(Stock.of(hubId, p2, 102));
         StockRes r3 = StockRes.from(Stock.of(hubId, p3, 103));
 
-        given(stockVariationService.increment(c1)).willReturn(r1);
-        given(stockVariationService.increment(c2)).willReturn(r2);
-        given(stockVariationService.increment(c3)).willReturn(r3);
+        List<IncreaseStockCommand> sortedCommands = List.of(c1, c2, c3);
+        given(stockVariationService.increment(sortedCommands)).willReturn(List.of(r1, r2, r3));
 
         List<StockRes> result = stockService.increment("idem-key", List.of(c3, c1, c2));
 
         assertThat(result).containsExactly(r1, r2, r3);
-        verify(stockVariationService).increment(c1);
-        verify(stockVariationService).increment(c2);
-        verify(stockVariationService).increment(c3);
+        verify(stockVariationService).increment(sortedCommands);
     }
 
     @Test

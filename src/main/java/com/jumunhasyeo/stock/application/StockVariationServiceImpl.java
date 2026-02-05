@@ -62,6 +62,14 @@ public class StockVariationServiceImpl implements StockVariationService {
         return res;
     }
 
+    @Override
+    @Transactional
+    public List<StockRes> increment(List<IncreaseStockCommand> commands) {
+        return commands.stream()
+                .map(this::increment)
+                .toList();
+    }
+
     private Stock getStock(UUID productId) {
         return stockRepository.findByProductId(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_EXCEPTION, "productId = "+productId));

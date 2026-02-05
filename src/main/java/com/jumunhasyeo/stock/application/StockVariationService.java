@@ -15,4 +15,6 @@ public interface StockVariationService {
     List<StockRes> decrement(List<DecreaseStockCommand> commands);
     //상품 재고 증가
     StockRes increment(IncreaseStockCommand command);
+    //상품 재고 증가
+    List<StockRes> increment(List<IncreaseStockCommand> commands);
 }

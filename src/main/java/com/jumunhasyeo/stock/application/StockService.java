@@ -63,17 +63,11 @@ public class StockService {
 
     //상품 재고 증가
     @DbIdempotent(ttlDays = 1)
-    @Transactional
     public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commandList){
-        List<StockRes> result = new ArrayList<>();
-
         List<IncreaseStockCommand> sortedList = new ArrayList<>(commandList);
         sortedList.sort(Comparator.comparing(IncreaseStockCommand::productId));
 
-        for (IncreaseStockCommand command : sortedList) {
-            result.add(stockVariationService.increment(command));
-        }
-        return result;
+        return stockVariationService.increment(sortedList);
     }
 
     private Stock getStock(UUID stockId){

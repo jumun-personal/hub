@@ -64,4 +64,9 @@ public class DynamicStockVariationServiceProxy implements StockVariationService 
     public StockRes increment(IncreaseStockCommand command) {
         return resolve().increment(command);
     }
+
+    @Override
+    public List<StockRes> increment(List<IncreaseStockCommand> commands) {
+        return resolve().increment(commands);
+    }
 }

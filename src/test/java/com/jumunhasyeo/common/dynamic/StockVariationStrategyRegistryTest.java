@@ -89,5 +89,12 @@ class StockVariationStrategyRegistryTest {
         public StockRes increment(IncreaseStockCommand command) {
             return new StockRes(UUID.randomUUID(), UUID.randomUUID(), command.productId(), 0, null, null);
         }
+
+        @Override
+        public List<StockRes> increment(List<IncreaseStockCommand> commands) {
+            return commands.stream()
+                    .map(this::increment)
+                    .toList();
+        }
     }
 }

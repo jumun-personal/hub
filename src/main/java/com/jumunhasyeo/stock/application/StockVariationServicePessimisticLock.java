@@ -54,6 +54,14 @@ public class StockVariationServicePessimisticLock implements StockVariationServi
         return StockRes.from(stock);
     }
 
+    @Override
+    @Transactional
+    public List<StockRes> increment(List<IncreaseStockCommand> commands) {
+        return commands.stream()
+                .map(this::increment)
+                .toList();
+    }
+
     private Stock getStockByPessimisticLock(UUID productId) {
         return stockRepository.findByProductIdWithLock(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_EXCEPTION,"productId = "+productId));
