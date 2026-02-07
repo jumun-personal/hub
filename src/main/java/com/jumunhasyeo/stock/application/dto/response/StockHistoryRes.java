@@ -17,7 +17,7 @@ public record StockHistoryRes(
         @Schema(description = "상품 ID")
         UUID productId,
         
-        @Schema(description = "이력 타입 (STORE: 입고, SHIPPED: 출고)")
+        @Schema(description = "이력 타입 (DECREASE: 재고 감소, INCREASE: 재고 증가)")
         String type,
         
         @Schema(description = "수량")

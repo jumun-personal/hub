@@ -4,12 +4,14 @@ import com.jumunhasyeo.stock.domain.entity.StockHistory;
 import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JpaStockHistoryRepositorySliceTest extends RepositorySliceTest {
 
@@ -22,8 +24,10 @@ class JpaStockHistoryRepositorySliceTest extends RepositorySliceTest {
         UUID hubId = UUID.randomUUID();
         String idempotencyKey = "idem-request-level";
 
-        StockHistory history1 = StockHistory.ofStore(hubId, UUID.randomUUID(), 10, idempotencyKey);
-        StockHistory history2 = StockHistory.ofStore(hubId, UUID.randomUUID(), 20, idempotencyKey);
+        UUID productId1 = UUID.randomUUID();
+        UUID productId2 = UUID.randomUUID();
+        StockHistory history1 = StockHistory.ofDecrease(hubId, productId1, 10, idempotencyKey);
+        StockHistory history2 = StockHistory.ofDecrease(hubId, productId2, 20, idempotencyKey);
 
         List<StockHistory> saved = jpaStockHistoryRepository.saveAll(List.of(history1, history2));
         testEntityManager.flush();
@@ -31,5 +35,25 @@ class JpaStockHistoryRepositorySliceTest extends RepositorySliceTest {
 
         assertThat(saved).hasSize(2);
         assertThat(jpaStockHistoryRepository.count()).isEqualTo(2);
+        assertThat(jpaStockHistoryRepository.findByIdempotencyKeyAndType(idempotencyKey, StockHistory.StockHistoryType.DECREASE))
+                .extracting(StockHistory::getProductId)
+                .containsExactlyInAnyOrder(productId1, productId2);
+    }
+
+    @Test
+    @DisplayName("동일 멱등키, 상품, 타입의 재고 이력은 중복 저장할 수 없다.")
+    void duplicate_idempotency_product_type_throws() {
+        UUID hubId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        String idempotencyKey = "idem-duplicate";
+
+        StockHistory history1 = StockHistory.ofDecrease(hubId, productId, 10, idempotencyKey);
+        StockHistory history2 = StockHistory.ofDecrease(hubId, productId, 10, idempotencyKey);
+
+        jpaStockHistoryRepository.save(history1);
+        jpaStockHistoryRepository.save(history2);
+
+        assertThatThrownBy(() -> testEntityManager.flush())
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

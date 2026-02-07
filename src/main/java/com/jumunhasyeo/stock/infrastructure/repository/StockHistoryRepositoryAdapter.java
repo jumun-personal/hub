@@ -22,4 +22,9 @@ public class StockHistoryRepositoryAdapter implements StockHistoryRepository {
     public List<StockHistory> saveAll(List<StockHistory> stockHistories) {
         return jpaStockHistoryRepository.saveAll(stockHistories);
     }
+
+    @Override
+    public List<StockHistory> findByIdempotencyKeyAndType(String idempotencyKey, StockHistory.StockHistoryType type) {
+        return jpaStockHistoryRepository.findByIdempotencyKeyAndType(idempotencyKey, type);
+    }
 }

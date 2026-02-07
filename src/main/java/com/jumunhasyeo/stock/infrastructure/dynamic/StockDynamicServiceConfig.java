@@ -2,6 +2,7 @@ package com.jumunhasyeo.stock.infrastructure.dynamic;
 
 import com.jumunhasyeo.stock.application.StockVariationServiceImpl;
 import com.jumunhasyeo.stock.application.StockVariationServicePessimisticLock;
+import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -19,18 +20,20 @@ public class StockDynamicServiceConfig {
     @Qualifier("stockVariationStrategy")
     public StockVariationServiceImpl stockVariationServiceImpl(
             StockRepository stockRepository,
+            StockHistoryRepository stockHistoryRepository,
             EntityManager entityManager
     ) {
         log.info("[Dynamic] Creating StockVariationServiceImpl");
-        return new StockVariationServiceImpl(stockRepository, entityManager);
+        return new StockVariationServiceImpl(stockRepository, stockHistoryRepository, entityManager);
     }
 
     @Bean
     @Qualifier("stockVariationStrategy")
     public StockVariationServicePessimisticLock stockVariationServicePessimisticLock(
-            StockRepository stockRepository
+            StockRepository stockRepository,
+            StockHistoryRepository stockHistoryRepository
     ) {
         log.info("[Dynamic] Creating StockVariationServicePessimisticLock");
-        return new StockVariationServicePessimisticLock(stockRepository);
+        return new StockVariationServicePessimisticLock(stockRepository, stockHistoryRepository);
     }
 }

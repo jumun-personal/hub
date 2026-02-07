@@ -7,4 +7,5 @@ import java.util.List;
 public interface StockHistoryRepository {
     StockHistory save(StockHistory stockHistory);
     List<StockHistory> saveAll(List<StockHistory> stockHistories);
+    List<StockHistory> findByIdempotencyKeyAndType(String idempotencyKey, StockHistory.StockHistoryType type);
 }

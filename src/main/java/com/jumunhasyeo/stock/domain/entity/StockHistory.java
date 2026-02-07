@@ -10,7 +10,15 @@ import java.util.UUID;
 
 @Entity
 @Getter
-@Table(name = "p_stock_history")
+@Table(
+        name = "p_stock_history",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_stock_history_idempotency_product_type",
+                        columnNames = {"idempotency_key", "product_id", "type"}
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StockHistory extends BaseEntity {
 
@@ -35,7 +43,7 @@ public class StockHistory extends BaseEntity {
     @Column(name = "memo", length = 500)
     private String memo;
 
-    @Column(name = "idempotencyKey")
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 
     private StockHistory(UUID hubId, UUID productId, StockHistoryType type, int quantity, String memo, String idempotencyKey) {
@@ -46,17 +54,17 @@ public class StockHistory extends BaseEntity {
         this.idempotencyKey = idempotencyKey;
     }
 
-    public static StockHistory ofStore(UUID hubId, UUID productId, int quantity, String idempotencyKey) {
-        return new StockHistory(hubId, productId, StockHistoryType.STORE, quantity, null, idempotencyKey);
+    public static StockHistory ofDecrease(UUID hubId, UUID productId, int quantity, String idempotencyKey) {
+        return new StockHistory(hubId, productId, StockHistoryType.DECREASE, quantity, null, idempotencyKey);
     }
 
-    public static StockHistory ofShipped(UUID hubId, UUID productId, int quantity, String idempotencyKey) {
-        return new StockHistory(hubId, productId, StockHistoryType.SHIPPED, quantity, null, idempotencyKey);
+    public static StockHistory ofIncrease(UUID hubId, UUID productId, int quantity, String idempotencyKey) {
+        return new StockHistory(hubId, productId, StockHistoryType.INCREASE, quantity, null, idempotencyKey);
     }
 
     public enum StockHistoryType {
-        STORE("입고"),
-        SHIPPED("출고");
+        DECREASE("재고 감소"),
+        INCREASE("재고 증가");
 
         private final String description;
 

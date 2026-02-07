@@ -79,7 +79,7 @@ class StockVariationStrategyRegistryTest {
         }
 
         @Override
-        public List<StockRes> decrement(List<DecreaseStockCommand> commands) {
+        public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
             return commands.stream()
                     .map(this::decrement)
                     .toList();
@@ -91,7 +91,7 @@ class StockVariationStrategyRegistryTest {
         }
 
         @Override
-        public List<StockRes> increment(List<IncreaseStockCommand> commands) {
+        public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
             return commands.stream()
                     .map(this::increment)
                     .toList();

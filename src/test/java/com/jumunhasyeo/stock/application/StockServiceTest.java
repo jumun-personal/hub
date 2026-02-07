@@ -6,15 +6,10 @@ import com.jumunhasyeo.stock.application.command.CreateStockCommand;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.DeleteStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
-import com.jumunhasyeo.stock.application.command.ShippedStockCommand;
-import com.jumunhasyeo.stock.application.command.StoreStockCommand;
-import com.jumunhasyeo.stock.application.dto.response.StockHistoryRes;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.application.service.HubClient;
 import com.jumunhasyeo.stock.application.service.ProductClient;
 import com.jumunhasyeo.stock.domain.entity.Stock;
-import com.jumunhasyeo.stock.domain.entity.StockHistory;
-import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +25,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -43,8 +37,6 @@ class StockServiceTest {
     private StockVariationService stockVariationService;
     @Mock
     private StockRepository stockRepository;
-    @Mock
-    private StockHistoryRepository stockHistoryRepository;
     @Mock
     private HubClient hubClient;
     @Mock
@@ -217,12 +209,12 @@ class StockServiceTest {
         StockRes r3 = StockRes.from(Stock.of(hubId, p3, 97));
 
         List<DecreaseStockCommand> sortedCommands = List.of(c1, c2, c3);
-        given(stockVariationService.decrement(sortedCommands)).willReturn(List.of(r1, r2, r3));
+        given(stockVariationService.decrement("idem-key", sortedCommands)).willReturn(List.of(r1, r2, r3));
 
         List<StockRes> result = stockService.decrement("idem-key", List.of(c3, c1, c2));
 
         assertThat(result).containsExactly(r1, r2, r3);
-        verify(stockVariationService).decrement(sortedCommands);
+        verify(stockVariationService).decrement("idem-key", sortedCommands);
     }
 
     @Test
@@ -242,102 +234,11 @@ class StockServiceTest {
         StockRes r3 = StockRes.from(Stock.of(hubId, p3, 103));
 
         List<IncreaseStockCommand> sortedCommands = List.of(c1, c2, c3);
-        given(stockVariationService.increment(sortedCommands)).willReturn(List.of(r1, r2, r3));
+        given(stockVariationService.increment("idem-key", sortedCommands)).willReturn(List.of(r1, r2, r3));
 
         List<StockRes> result = stockService.increment("idem-key", List.of(c3, c1, c2));
 
         assertThat(result).containsExactly(r1, r2, r3);
-        verify(stockVariationService).increment(sortedCommands);
-    }
-
-    @Test
-    @DisplayName("입고 이력 저장 후 StockHistoryRes로 변환한다.")
-    void store_should_save_histories_and_return_response() {
-        UUID hubId = UUID.randomUUID();
-        UUID productId = UUID.randomUUID();
-        StoreStockCommand command = new StoreStockCommand(hubId, productId, 10);
-
-        StockHistory history = StockHistory.ofStore(hubId, productId, 10, "idem-store");
-        given(stockHistoryRepository.saveAll(any())).willReturn(List.of(history));
-
-        List<StockHistoryRes> result = stockService.store("idem-store", List.of(command));
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).hubId()).isEqualTo(hubId);
-        assertThat(result.get(0).productId()).isEqualTo(productId);
-        assertThat(result.get(0).type()).isEqualTo(StockHistory.StockHistoryType.STORE.name());
-        assertThat(result.get(0).quantity()).isEqualTo(10);
-        verify(stockHistoryRepository).saveAll(argThat(histories ->
-                histories.size() == 1 && "idem-store".equals(histories.get(0).getIdempotencyKey())
-        ));
-        verifyNoInteractions(stockVariationService);
-    }
-
-    @Test
-    @DisplayName("출고 이력 저장 후 StockHistoryRes로 변환한다.")
-    void shipped_should_save_histories_and_return_response() {
-        UUID hubId = UUID.randomUUID();
-        UUID productId = UUID.randomUUID();
-        ShippedStockCommand command = new ShippedStockCommand(hubId, productId, 5);
-
-        StockHistory history = StockHistory.ofShipped(hubId, productId, 5, "idem-shipped");
-        given(stockHistoryRepository.saveAll(any())).willReturn(List.of(history));
-
-        List<StockHistoryRes> result = stockService.shipped("idem-shipped", List.of(command));
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).hubId()).isEqualTo(hubId);
-        assertThat(result.get(0).productId()).isEqualTo(productId);
-        assertThat(result.get(0).type()).isEqualTo(StockHistory.StockHistoryType.SHIPPED.name());
-        assertThat(result.get(0).quantity()).isEqualTo(5);
-        verify(stockHistoryRepository).saveAll(argThat(histories ->
-                histories.size() == 1 && "idem-shipped".equals(histories.get(0).getIdempotencyKey())
-        ));
-        verifyNoInteractions(stockVariationService);
-    }
-
-    @Test
-    @DisplayName("입고 이력 다건 저장 시 요청 단위 멱등키를 공통으로 저장한다.")
-    void store_should_use_same_idempotency_key_for_all_lines() {
-        UUID hubId = UUID.randomUUID();
-        UUID productId1 = UUID.randomUUID();
-        UUID productId2 = UUID.randomUUID();
-        List<StoreStockCommand> commands = List.of(
-                new StoreStockCommand(hubId, productId1, 10),
-                new StoreStockCommand(hubId, productId2, 20)
-        );
-
-        given(stockHistoryRepository.saveAll(any())).willAnswer(invocation -> invocation.getArgument(0));
-
-        List<StockHistoryRes> result = stockService.store("idem-batch-store", commands);
-
-        assertThat(result).hasSize(2);
-        verify(stockHistoryRepository).saveAll(argThat(histories ->
-                histories.size() == 2
-                        && histories.stream().allMatch(history -> "idem-batch-store".equals(history.getIdempotencyKey()))
-        ));
-    }
-
-    @Test
-    @DisplayName("출고 이력 다건 저장 시 요청 단위 멱등키를 공통으로 저장한다.")
-    void shipped_should_use_same_idempotency_key_for_all_lines() {
-        UUID hubId = UUID.randomUUID();
-        UUID productId1 = UUID.randomUUID();
-        UUID productId2 = UUID.randomUUID();
-        List<ShippedStockCommand> commands = List.of(
-                new ShippedStockCommand(hubId, productId1, 5),
-                new ShippedStockCommand(hubId, productId2, 7)
-        );
-
-        given(stockHistoryRepository.saveAll(any())).willAnswer(invocation -> invocation.getArgument(0));
-
-        List<StockHistoryRes> result = stockService.shipped("idem-batch-shipped", commands);
-
-        assertThat(result).hasSize(2);
-        verify(stockHistoryRepository).saveAll(argThat(histories ->
-                histories.size() == 2
-                        && histories.stream().allMatch(history -> "idem-batch-shipped".equals(history.getIdempotencyKey()))
-        ));
-        verifyNoInteractions(stockVariationService);
+        verify(stockVariationService).increment("idem-key", sortedCommands);
     }
 }

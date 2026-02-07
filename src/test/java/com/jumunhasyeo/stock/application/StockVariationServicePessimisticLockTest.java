@@ -7,6 +7,7 @@ import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.domain.entity.Stock;
+import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,8 @@ class StockVariationServicePessimisticLockTest {
 
     @Mock
     private StockRepository stockRepository;
+    @Mock
+    private StockHistoryRepository stockHistoryRepository;
 
     @InjectMocks
     private StockVariationServicePessimisticLock service;

@@ -15,13 +15,13 @@ class StockHistoryResTest {
     void from_success() {
         UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        StockHistory history = StockHistory.ofStore(hubId, productId, 8, "idem-key");
+        StockHistory history = StockHistory.ofDecrease(hubId, productId, 8, "idem-key");
 
         StockHistoryRes result = StockHistoryRes.from(history);
 
         assertThat(result.hubId()).isEqualTo(hubId);
         assertThat(result.productId()).isEqualTo(productId);
-        assertThat(result.type()).isEqualTo("STORE");
+        assertThat(result.type()).isEqualTo("DECREASE");
         assertThat(result.quantity()).isEqualTo(8);
         assertThat(result.memo()).isNull();
     }

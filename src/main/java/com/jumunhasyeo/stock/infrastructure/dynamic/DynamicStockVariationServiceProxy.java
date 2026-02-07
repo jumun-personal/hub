@@ -56,8 +56,8 @@ public class DynamicStockVariationServiceProxy implements StockVariationService 
     }
 
     @Override
-    public List<StockRes> decrement(List<DecreaseStockCommand> commands) {
-        return resolve().decrement(commands);
+    public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
+        return resolve().decrement(idempotencyKey, commands);
     }
     
     @Override
@@ -66,7 +66,7 @@ public class DynamicStockVariationServiceProxy implements StockVariationService 
     }
 
     @Override
-    public List<StockRes> increment(List<IncreaseStockCommand> commands) {
-        return resolve().increment(commands);
+    public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
+        return resolve().increment(idempotencyKey, commands);
     }
 }
