@@ -1,5 +1,7 @@
 package com.jumunhasyeo.hub.infrastructure.outbox;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -16,11 +18,16 @@ public class OutboxDispatcher {
     @Value("${spring.kafka.topics.hub}")
     private String hubTopic;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
 
     public void dispatch(OutboxEvent event) {
         if(event.getTopic().equals(hubTopic)) {
             try {
-                ProducerRecord<String, String> record = new ProducerRecord<>(hubTopic, event.getPayload());
+                ProducerRecord<String, String> record = new ProducerRecord<>(
+                        hubTopic,
+                        resolvePartitionKey(event),
+                        event.getPayload()
+                );
                 record.headers().add("eventType", event.getEventName().getBytes());
                 record.headers().add("source", "hub-service".getBytes());
 
@@ -34,6 +41,23 @@ public class OutboxDispatcher {
         }
         else{
             throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 토픽입니다. topic=" + event.getTopic());
+        }
+    }
+
+    private String resolvePartitionKey(OutboxEvent event) {
+        try {
+            JsonNode payload = objectMapper.readTree(event.getPayload());
+            JsonNode hubId = payload.get("hubId");
+            if (hubId != null && !hubId.isNull()) {
+                return hubId.asText();
+            }
+            JsonNode startHub = payload.get("startHub");
+            if (startHub != null && !startHub.isNull()) {
+                return startHub.asText();
+            }
+            return event.getEventKey();
+        } catch (Exception e) {
+            return event.getEventKey();
         }
     }
 }

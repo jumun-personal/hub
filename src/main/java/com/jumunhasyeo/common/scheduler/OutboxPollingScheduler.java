@@ -1,6 +1,5 @@
 package com.jumunhasyeo.common.scheduler;
 
-import com.jumunhasyeo.hub.infrastructure.outbox.OutboxEvent;
 import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,10 +9,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.List;
-
-import static com.jumunhasyeo.hub.infrastructure.outbox.OutboxStatus.FAILED;
-import static com.jumunhasyeo.hub.infrastructure.outbox.OutboxStatus.PENDING;
 
 @Component
 @RequiredArgsConstructor
@@ -26,16 +21,9 @@ public class OutboxPollingScheduler {
     @SchedulerLock(name = "outboxPolling", lockAtLeastFor = "5s")
     @Scheduled(fixedDelay = 5000) // 2초마다 Polling
     public void pollOutbox() {
-        List<OutboxEvent> failedEvents = outboxService.findTop100ByStatusOrderByIdAsc(FAILED);
-        for (OutboxEvent event : failedEvents) {
-            outboxService.outboxProcess(event);
-        }
-
+        outboxService.processFailedEventsWithLock();
         LocalDateTime pendingCutoff = LocalDateTime.now().minusMinutes(5);
-        List<OutboxEvent> pendingEvents = outboxService.findTop100ByStatusAndCreatedAtBeforeOrderByIdAsc(PENDING, pendingCutoff);
-        for (OutboxEvent event : pendingEvents) {
-            outboxService.outboxProcess(event);
-        }
+        outboxService.processPendingEventsWithLock(pendingCutoff);
     }
 
 

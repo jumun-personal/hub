@@ -29,6 +29,16 @@ public class OutboxRepositoryAdapter implements OutboxRepository{
     }
 
     @Override
+    public List<OutboxEvent> findTop100ByStatusForUpdateSkipLocked(OutboxStatus status) {
+        return jpaOutboxRepository.findTop100ByStatusForUpdateSkipLocked(status.name());
+    }
+
+    @Override
+    public List<OutboxEvent> findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(OutboxStatus status, LocalDateTime createdAt) {
+        return jpaOutboxRepository.findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(status.name(), createdAt);
+    }
+
+    @Override
     public int deleteByStatusAndCreatedAtBefore(OutboxStatus outboxStatus, LocalDateTime localDateTime) {
         return jpaOutboxRepository.deleteByStatusAndCreatedAtBefore(outboxStatus, localDateTime);
     }

@@ -66,6 +66,25 @@ public class OutboxService {
         }
     }
 
+    @Transactional
+    public void processFailedEventsWithLock() {
+        List<OutboxEvent> failedEvents = outboxRepository.findTop100ByStatusForUpdateSkipLocked(OutboxStatus.FAILED);
+        for (OutboxEvent event : failedEvents) {
+            outboxProcess(event);
+        }
+    }
+
+    @Transactional
+    public void processPendingEventsWithLock(LocalDateTime pendingCutoff) {
+        List<OutboxEvent> pendingEvents = outboxRepository.findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(
+                OutboxStatus.PENDING,
+                pendingCutoff
+        );
+        for (OutboxEvent event : pendingEvents) {
+            outboxProcess(event);
+        }
+    }
+
     public int cleanUp(LocalDateTime cutoff) {
         return outboxRepository.deleteByStatusAndCreatedAtBefore(
                 OutboxStatus.COMPLETE, cutoff
