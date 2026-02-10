@@ -92,6 +92,8 @@ class HubRouteServiceTest {
         ArgumentCaptor<List<HubRouteCreatedEvent>> captor = ArgumentCaptor.forClass(List.class);
         verify(hubRouteEventPublisher).publishRouteCreatedEvent(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue())
+                .allSatisfy(event -> assertThat(event.getHubId()).isEqualTo(command.hubId()));
     }
 
     @Test
@@ -108,7 +110,10 @@ class HubRouteServiceTest {
 
         verify(routeWeightApi).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
-        verify(hubRouteEventPublisher).publishRouteCreatedEvent(any());
+        ArgumentCaptor<List<HubRouteCreatedEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(hubRouteEventPublisher).publishRouteCreatedEvent(captor.capture());
+        assertThat(captor.getValue())
+                .allSatisfy(event -> assertThat(event.getHubId()).isEqualTo(command.hubId()));
     }
 
     @Test

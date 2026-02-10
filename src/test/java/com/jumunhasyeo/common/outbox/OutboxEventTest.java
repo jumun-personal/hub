@@ -71,6 +71,21 @@ public class OutboxEventTest {
     }
 
     @Test
+    @DisplayName("발행 전 이벤트를 처리중 상태로 클레임할 수 있다.")
+    void claimProcessing_success() {
+        // given
+        OutboxEvent event = createOutboxEvent();
+
+        // when
+        event.claimProcessing();
+
+        // then
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.PROCESSING);
+        assertThat(event.getClaimedAt()).isNotNull();
+        assertThat(event.getProcessedAt()).isNull();
+    }
+
+    @Test
     @DisplayName("완료 상태로 변경할 수 있다.")
     void markProcessed_success() {
         //given
@@ -81,6 +96,7 @@ public class OutboxEventTest {
 
         //then
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
+        assertThat(event.getProcessedAt()).isNotNull();
     }
 
     @Test
@@ -99,8 +115,24 @@ public class OutboxEventTest {
     }
 
     @Test
+    @DisplayName("최종 실패 상태로 변경할 수 있다.")
+    void markDead_success() {
+        // given
+        OutboxEvent event = createOutboxEvent();
+        String errorMessage = "Max retry count exceeded";
+
+        // when
+        event.markDead(errorMessage);
+
+        // then
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.DEAD);
+        assertThat(event.getErrorMessage()).isEqualTo(errorMessage);
+        assertThat(event.getProcessedAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("발행 성공 시 재시도 횟수를 증가하고 완료 상태로 변경한다.")
-    void publishSuccess_success() {
+    void publishSuccess_marksComplete() {
         //given
         OutboxEvent event = createOutboxEvent();
         int initialCount = event.getRetryCount();
@@ -109,7 +141,7 @@ public class OutboxEventTest {
         event.publishSuccess();
 
         //then
-        assertThat(event.getRetryCount()).isEqualTo(initialCount + 1);
+        assertThat(event.getRetryCount()).isEqualTo(initialCount);
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
     }
 
@@ -126,6 +158,25 @@ public class OutboxEventTest {
 
         //then
         assertThat(event.getRetryCount()).isEqualTo(initialCount + 1);
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.FAILED);
+        assertThat(event.getErrorMessage()).isEqualTo(errorMessage);
+    }
+
+    @Test
+    @DisplayName("발행 실패 횟수가 최대값에 도달하면 최종 실패 상태로 변경한다.")
+    void publishFail_whenMaxRetryReached_marksDead() {
+        // given
+        OutboxEvent event = createOutboxEvent();
+        event.incrementRetryCount();
+        event.incrementRetryCount();
+        String errorMessage = "Publish failed";
+
+        // when
+        event.publishFail(errorMessage);
+
+        // then
+        assertThat(event.getRetryCount()).isEqualTo(3);
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(event.getErrorMessage()).isEqualTo(errorMessage);
     }
 

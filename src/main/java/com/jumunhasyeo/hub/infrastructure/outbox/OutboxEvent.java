@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Type;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -52,6 +53,12 @@ public class OutboxEvent extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String errorMessage = "";
 
+    @Column
+    private LocalDateTime claimedAt;
+
+    @Column
+    private LocalDateTime processedAt;
+
     private OutboxEvent(String eventName, String payload, OutboxStatus status, String eventKey, String topic) {
         this.eventName = eventName;
         this.payload = payload;
@@ -66,13 +73,26 @@ public class OutboxEvent extends BaseEntity {
         return new OutboxEvent(eventName, payload, OutboxStatus.PENDING, eventKey, topic);
     }
 
+    public void claimProcessing() {
+        this.status = OutboxStatus.PROCESSING;
+        this.claimedAt = LocalDateTime.now();
+        this.processedAt = null;
+    }
+
     public void markProcessed() {
         this.status = OutboxStatus.COMPLETE;
+        this.processedAt = LocalDateTime.now();
     }
 
     public void markFailed(String errorMessage) {
         this.status = OutboxStatus.FAILED;
         this.errorMessage = errorMessage;
+    }
+
+    public void markDead(String errorMessage) {
+        this.status = OutboxStatus.DEAD;
+        this.errorMessage = errorMessage;
+        this.processedAt = LocalDateTime.now();
     }
 
     public void incrementRetryCount() {
@@ -88,12 +108,15 @@ public class OutboxEvent extends BaseEntity {
     }
 
     public void publishSuccess() {
-        incrementRetryCount();
         markProcessed();
     }
 
     public void publishFail(String errMessage) {
         incrementRetryCount();
-        markFailed(errMessage);
+        if (canRetry()) {
+            markFailed(errMessage);
+            return;
+        }
+        markDead(errMessage);
     }
 }

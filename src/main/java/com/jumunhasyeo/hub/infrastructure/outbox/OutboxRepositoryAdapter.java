@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -29,13 +30,24 @@ public class OutboxRepositoryAdapter implements OutboxRepository{
     }
 
     @Override
-    public List<OutboxEvent> findTop100ByStatusForUpdateSkipLocked(OutboxStatus status) {
-        return jpaOutboxRepository.findTop100ByStatusForUpdateSkipLocked(status.name());
+    public List<OutboxEvent> findTop100ClaimableForUpdateSkipLocked(LocalDateTime staleBefore) {
+        return jpaOutboxRepository.findTop100ClaimableForUpdateSkipLocked(
+                OutboxStatus.PENDING.name(),
+                OutboxStatus.FAILED.name(),
+                OutboxStatus.PROCESSING.name(),
+                staleBefore
+        );
     }
 
     @Override
-    public List<OutboxEvent> findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(OutboxStatus status, LocalDateTime createdAt) {
-        return jpaOutboxRepository.findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(status.name(), createdAt);
+    public Optional<OutboxEvent> findClaimableByEventKeyForUpdateSkipLocked(String eventKey, LocalDateTime staleBefore) {
+        return jpaOutboxRepository.findClaimableByEventKeyForUpdateSkipLocked(
+                eventKey,
+                OutboxStatus.PENDING.name(),
+                OutboxStatus.FAILED.name(),
+                OutboxStatus.PROCESSING.name(),
+                staleBefore
+        );
     }
 
     @Override

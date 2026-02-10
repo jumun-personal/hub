@@ -143,7 +143,7 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
 
     @Test
     @DisplayName("재시도 가능한 이벤트를 처리하면 COMPLETE 상태가 된다.")
-    void outboxProcess_integration_success() {
+    void publishClaimedEvent_integration_success() {
         //given
         doNothing().when(outboxDispatcher).dispatch(any());
 
@@ -156,17 +156,17 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
         jpaOutboxRepository.save(event);
 
         //when
-        outboxService.outboxProcess(event);
+        outboxService.publishClaimedEvent(event);
 
         //then
         OutboxEvent savedEvent = jpaOutboxRepository.findByEventKey(event.getEventKey()).orElseThrow();
         assertThat(savedEvent.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
-        assertThat(savedEvent.getRetryCount()).isEqualTo(1);
+        assertThat(savedEvent.getRetryCount()).isEqualTo(0);
     }
 
     @Test
-    @DisplayName("재시도 불가능한 이벤트는 FAILED 상태가 된다.")
-    void outboxProcess_WhenCannotRetry_integration_marksFailed() {
+    @DisplayName("재시도 불가능한 이벤트는 DEAD 상태가 된다.")
+    void publishClaimedEvent_WhenCannotRetry_integration_marksDead() {
         //given
         doThrow(new RuntimeException("Dispatch failed"))
                 .when(outboxDispatcher).dispatch(any());
@@ -182,11 +182,11 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
         jpaOutboxRepository.save(event);
 
         //when
-        outboxService.outboxProcess(event);
+        outboxService.publishClaimedEvent(event);
 
         //then
         OutboxEvent savedEvent = jpaOutboxRepository.findByEventKey(event.getEventKey()).orElseThrow();
-        assertThat(savedEvent.getStatus()).isEqualTo(OutboxStatus.FAILED);
+        assertThat(savedEvent.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(savedEvent.getErrorMessage()).isEqualTo("Max retry count exceeded");
     }
 

@@ -20,6 +20,7 @@ public class OutboxService {
     @Value("${spring.kafka.topics.hub}")
     private String hubTopic;
     private final OutboxRepository outboxRepository;
+    private final OutboxClaimService outboxClaimService;
     private final OutboxDispatcher outboxDispatcher;
     private final ObjectMapper objectMapper;
 
@@ -34,10 +35,10 @@ public class OutboxService {
         }
     }
 
-    @Transactional
     public void publishAfterCommit(String eventKey) {
-        OutboxEvent outboxEvent = outboxRepository.findByEventKey(eventKey);
-        outboxProcess(outboxEvent);
+        LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(5);
+        outboxClaimService.claimByEventKey(eventKey, staleBefore)
+                .ifPresent(this::publishClaimedEvent);
     }
 
     @Transactional
@@ -46,42 +47,27 @@ public class OutboxService {
         outboxEvent.markProcessed();
     }
 
-    @Transactional
-    public OutboxEvent outboxProcess(OutboxEvent event) {
+    public OutboxEvent publishClaimedEvent(OutboxEvent event) {
         try {
             if (!event.canRetry()) {
-                event.markFailed("Max retry count exceeded");
+                event.markDead("Max retry count exceeded");
                 outboxRepository.save(event);
                 return event;
             }
 
             outboxDispatcher.dispatch(event);
-            event.publishSuccess();
-            outboxRepository.save(event);
+            outboxClaimService.markPublishSuccess(event);
             return event;
         } catch (Exception e) {
-            event.publishFail(e.getMessage());
-            outboxRepository.save(event);
+            outboxClaimService.markPublishFailure(event, e.getMessage());
             return event;
         }
     }
 
-    @Transactional
-    public void processFailedEventsWithLock() {
-        List<OutboxEvent> failedEvents = outboxRepository.findTop100ByStatusForUpdateSkipLocked(OutboxStatus.FAILED);
-        for (OutboxEvent event : failedEvents) {
-            outboxProcess(event);
-        }
-    }
-
-    @Transactional
-    public void processPendingEventsWithLock(LocalDateTime pendingCutoff) {
-        List<OutboxEvent> pendingEvents = outboxRepository.findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(
-                OutboxStatus.PENDING,
-                pendingCutoff
-        );
-        for (OutboxEvent event : pendingEvents) {
-            outboxProcess(event);
+    public void processClaimableEvents(LocalDateTime staleBefore) {
+        List<OutboxEvent> events = outboxClaimService.claimPublishableEvents(staleBefore);
+        for (OutboxEvent event : events) {
+            publishClaimedEvent(event);
         }
     }
 

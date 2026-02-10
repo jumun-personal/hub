@@ -21,9 +21,8 @@ public class OutboxPollingScheduler {
     @SchedulerLock(name = "outboxPolling", lockAtLeastFor = "5s")
     @Scheduled(fixedDelay = 5000) // 2초마다 Polling
     public void pollOutbox() {
-        outboxService.processFailedEventsWithLock();
-        LocalDateTime pendingCutoff = LocalDateTime.now().minusMinutes(5);
-        outboxService.processPendingEventsWithLock(pendingCutoff);
+        LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(5);
+        outboxService.processClaimableEvents(staleBefore);
     }
 
 

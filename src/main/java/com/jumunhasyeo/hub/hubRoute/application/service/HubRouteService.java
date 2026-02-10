@@ -56,7 +56,7 @@ public class HubRouteService {
 
         if (!hubRoutes.isEmpty()) {
             List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
-                    .map(HubRouteCreatedEvent::from)
+                    .map(route -> HubRouteCreatedEvent.from(command.hubId(), route))
                     .collect(Collectors.toList());
             hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
         }

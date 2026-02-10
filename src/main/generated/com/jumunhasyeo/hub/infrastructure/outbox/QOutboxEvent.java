@@ -21,6 +21,8 @@ public class QOutboxEvent extends EntityPathBase<OutboxEvent> {
 
     public final com.jumunhasyeo.common.QBaseEntity _super = new com.jumunhasyeo.common.QBaseEntity(this);
 
+    public final DateTimePath<java.time.LocalDateTime> claimedAt = createDateTime("claimedAt", java.time.LocalDateTime.class);
+
     //inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
@@ -53,6 +55,8 @@ public class QOutboxEvent extends EntityPathBase<OutboxEvent> {
     public final NumberPath<Long> modifiedBy = _super.modifiedBy;
 
     public final StringPath payload = createString("payload");
+
+    public final DateTimePath<java.time.LocalDateTime> processedAt = createDateTime("processedAt", java.time.LocalDateTime.class);
 
     public final NumberPath<Integer> retryCount = createNumber("retryCount", Integer.class);
 

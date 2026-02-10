@@ -1,6 +1,7 @@
 package com.jumunhasyeo.common.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.jumunhasyeo.hub.hub.infrastructure.event.HubDlqKafkaEventListener;
 import com.jumunhasyeo.hub.hub.infrastructure.event.HubKafkaEventListener;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.event.HubRouteDlqRecoverer;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.event.HubRouteKafkaEventListener;
@@ -83,10 +84,14 @@ class KafkaConfigTest {
         KafkaListener hubRouteListener = HubRouteKafkaEventListener.class
                 .getMethod("listen", String.class, String.class)
                 .getAnnotation(KafkaListener.class);
+        KafkaListener hubDlqListener = HubDlqKafkaEventListener.class
+                .getMethod("listen", String.class, String.class, String.class)
+                .getAnnotation(KafkaListener.class);
 
         assertThat(stockListener.containerFactory()).isEqualTo("stockKafkaListenerContainerFactory");
         assertThat(hubListener.containerFactory()).isEqualTo("kafkaListenerContainerFactory");
         assertThat(hubRouteListener.containerFactory()).isEqualTo("hubRouteKafkaListenerContainerFactory");
+        assertThat(hubDlqListener.containerFactory()).isEqualTo("kafkaListenerContainerFactory");
     }
 
     @Test

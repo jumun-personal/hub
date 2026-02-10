@@ -19,8 +19,8 @@ public class ResilientRouteWeightApiService implements RouteWeightApiService {
     private final NaverWeightRouteApiServiceImpl naverStrategy;
 
     @Override
-    @Retry(name = "kakaoRoute")
-    @CircuitBreaker(name = "kakaoRoute", fallbackMethod = "fallbackToNaver")
+    @Retry(name = "kakaoRoute", fallbackMethod = "fallbackToNaver")
+    @CircuitBreaker(name = "kakaoRoute")
     public RouteWeightResult getRouteInfo(RouteWeightQuery query) {
         return kakaoStrategy.getWeight(query);
     }

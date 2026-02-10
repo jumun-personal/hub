@@ -20,25 +20,39 @@ public interface JpaOutboxRepository extends JpaRepository<OutboxEvent, UUID> {
     @Query(value = """
             SELECT *
             FROM p_outbox_events
-            WHERE status = :status
-            ORDER BY id ASC
+            WHERE status = :pendingStatus
+               OR status = :failedStatus
+               OR (status = :processingStatus AND claimed_at < :staleBefore)
+            ORDER BY created_at ASC, id ASC
             LIMIT 100
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    List<OutboxEvent> findTop100ByStatusForUpdateSkipLocked(@Param("status") String status);
+    List<OutboxEvent> findTop100ClaimableForUpdateSkipLocked(
+            @Param("pendingStatus") String pendingStatus,
+            @Param("failedStatus") String failedStatus,
+            @Param("processingStatus") String processingStatus,
+            @Param("staleBefore") LocalDateTime staleBefore
+    );
 
     @Query(value = """
             SELECT *
             FROM p_outbox_events
-            WHERE status = :status
-              AND created_at < :createdAt
-            ORDER BY id ASC
-            LIMIT 100
+            WHERE event_key = :eventKey
+              AND (
+                    status = :pendingStatus
+                 OR status = :failedStatus
+                 OR (status = :processingStatus AND claimed_at < :staleBefore)
+              )
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    List<OutboxEvent> findTop100ByStatusAndCreatedAtBeforeForUpdateSkipLocked(
-            @Param("status") String status,
-            @Param("createdAt") LocalDateTime createdAt
+    Optional<OutboxEvent> findClaimableByEventKeyForUpdateSkipLocked(
+            @Param("eventKey") String eventKey,
+            @Param("pendingStatus") String pendingStatus,
+            @Param("failedStatus") String failedStatus,
+            @Param("processingStatus") String processingStatus,
+            @Param("staleBefore") LocalDateTime staleBefore
     );
 
     @Modifying

@@ -11,6 +11,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Getter
 public class HubRouteCreatedEvent extends HubRouteDomainEvent {
+    @Schema(description = "경로 생성 대상 허브 ID", example = "550e8400-e29b-41d4-a716-446655440000")
+    private UUID hubId;
     @Schema(description = "경로 ID", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID routeId;
     @Schema(description = "출발 허브", example = "550e8400-e29b-41d4-a716-446655440000")
@@ -22,14 +24,19 @@ public class HubRouteCreatedEvent extends HubRouteDomainEvent {
     @Schema(description = "예상 거리", example = "5")
     private int distanceKm;
 
-    public static HubRouteCreatedEvent from(HubRoute route) {
+    public static HubRouteCreatedEvent from(UUID hubId, HubRoute route) {
         return new HubRouteCreatedEvent(
+                hubId,
                 route.getRouteId(),
                 route.getStartHub().getHubId(),
                 route.getEndHub().getHubId(),
                 route.getRouteWeight().getDurationMinutes(),
                 (int) route.getRouteWeight().getDistanceKm().doubleValue()
         );
+    }
+
+    public static HubRouteCreatedEvent from(HubRoute route) {
+        return from(route.getStartHub().getHubId(), route);
     }
 
 }

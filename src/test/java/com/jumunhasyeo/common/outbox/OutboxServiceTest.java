@@ -17,13 +17,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_CREATED_EVENT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +40,9 @@ public class OutboxServiceTest {
 
     @Mock
     private OutboxRepository outboxRepository;
+
+    @Mock
+    private OutboxClaimService outboxClaimService;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -112,23 +113,27 @@ public class OutboxServiceTest {
     }
 
     @Test
-    @DisplayName("재시도 가능한 이벤트를 처리할 수 있다.")
-    void outboxProcess_WhenCanRetry_success() throws Exception {
+    @DisplayName("클레임된 이벤트를 발행할 수 있다.")
+    void publishClaimedEvent_success() throws Exception {
         //given
         OutboxEvent event = createOutboxEvent();
         doNothing().when(outboxDispatcher).dispatch(event);
+        doAnswer(invocation -> {
+            event.publishSuccess();
+            return null;
+        }).when(outboxClaimService).markPublishSuccess(event);
 
         //when
-        OutboxEvent outboxEvent = outboxService.outboxProcess(event);
+        OutboxEvent outboxEvent = outboxService.publishClaimedEvent(event);
 
         //then
+        then(outboxClaimService).should().markPublishSuccess(event);
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
-        assertThat(outboxEvent.getRetryCount()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("재시도 불가능한 이벤트는 실패 처리된다.")
-    void outboxProcess_WhenCannotRetry_marksFailed() {
+    @DisplayName("재시도 불가능한 이벤트는 최종 실패 처리된다.")
+    void publishClaimedEvent_WhenCannotRetry_marksDead() {
         //given
         OutboxEvent event = createOutboxEvent();
         event.incrementRetryCount();
@@ -136,28 +141,63 @@ public class OutboxServiceTest {
         event.incrementRetryCount();
 
         //when
-        outboxService.outboxProcess(event);
+        outboxService.publishClaimedEvent(event);
 
         //then
         then(kafkaTemplate).should(never()).send(anyString(), anyString());
-        assertThat(event.getStatus()).isEqualTo(OutboxStatus.FAILED);
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(event.getErrorMessage()).isEqualTo("Max retry count exceeded");
     }
 
     @Test
-    @DisplayName("Kafka 발행 실패 시 실패 처리된다.")
-    void outboxProcess_WhenKafkaFails_publishFail() {
+    @DisplayName("Kafka 발행 실패 시 실패 상태 저장을 위임한다.")
+    void publishClaimedEvent_WhenKafkaFails_publishFail() {
         //given
         OutboxEvent event = createOutboxEvent();
         doThrow(new RuntimeException("에러")).when(outboxDispatcher).dispatch(event);
+        doAnswer(invocation -> {
+            event.publishFail("에러");
+            return null;
+        }).when(outboxClaimService).markPublishFailure(event, "에러");
 
         //when
-        OutboxEvent outboxEvent = outboxService.outboxProcess(event);
+        OutboxEvent outboxEvent = outboxService.publishClaimedEvent(event);
 
         //then
-        then(outboxRepository).should().save(event);
+        then(outboxClaimService).should().markPublishFailure(event, "에러");
         assertThat(outboxEvent.getRetryCount()).isEqualTo(1);
         assertThat(outboxEvent.getErrorMessage()).isEqualTo("에러");
+    }
+
+    @Test
+    @DisplayName("After Commit 발행은 클레임 성공 시에만 Kafka 발행을 수행한다.")
+    void publishAfterCommit_WhenClaimSuccess_publishesEvent() {
+        // given
+        String eventKey = "test-key";
+        OutboxEvent event = createOutboxEvent();
+        given(outboxClaimService.claimByEventKey(eq(eventKey), any(LocalDateTime.class)))
+                .willReturn(Optional.of(event));
+
+        // when
+        outboxService.publishAfterCommit(eventKey);
+
+        // then
+        then(outboxDispatcher).should().dispatch(event);
+    }
+
+    @Test
+    @DisplayName("After Commit 발행은 클레임 실패 시 Kafka 발행을 건너뛴다.")
+    void publishAfterCommit_WhenClaimFails_skipsPublish() {
+        // given
+        String eventKey = "test-key";
+        given(outboxClaimService.claimByEventKey(eq(eventKey), any(LocalDateTime.class)))
+                .willReturn(Optional.empty());
+
+        // when
+        outboxService.publishAfterCommit(eventKey);
+
+        // then
+        then(outboxDispatcher).should(never()).dispatch(any());
     }
 
     @Test
@@ -204,6 +244,21 @@ public class OutboxServiceTest {
         //then
         assertThat(events).hasSize(1);
         assertThat(events).isEqualTo(expectedEvents);
+    }
+
+    @Test
+    @DisplayName("스케줄러 발행은 클레임된 이벤트만 처리한다.")
+    void processClaimableEvents_publishesClaimedEvents() {
+        // given
+        LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(5);
+        OutboxEvent event = createOutboxEvent();
+        given(outboxClaimService.claimPublishableEvents(staleBefore)).willReturn(List.of(event));
+
+        // when
+        outboxService.processClaimableEvents(staleBefore);
+
+        // then
+        then(outboxDispatcher).should().dispatch(event);
     }
 
     private static OutboxEvent createOutboxEvent() {
