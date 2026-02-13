@@ -8,12 +8,12 @@ import org.hibernate.annotations.Type;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "p_db_idempotency_keys")
+@Table(name = "p_idempotency_keys")
 @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @Getter
-public class DbIdempotentKey {
+public class IdempotencyKey {
     @Id
     private String idempotencyKey;
 
@@ -35,14 +35,20 @@ public class DbIdempotentKey {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "expiresAt", nullable = false)
+    @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
-    public static DbIdempotentKey create(String idempotencyKey, long ttlSeconds, IdempotentType type, String payload) {
+    public static IdempotencyKey create(
+            String idempotencyKey,
+            IdempotentStatus status,
+            long ttlSeconds,
+            IdempotentType type,
+            String payload
+    ) {
         String errorMsg = "";
-        return new DbIdempotentKey(
+        return new IdempotencyKey(
                 idempotencyKey,
-                IdempotentStatus.PROCESSING,
+                status,
                 payload,
                 errorMsg,
                 type,
@@ -63,4 +69,3 @@ public class DbIdempotentKey {
         return "CANCEL_" + this.idempotencyKey;
     }
 }
-

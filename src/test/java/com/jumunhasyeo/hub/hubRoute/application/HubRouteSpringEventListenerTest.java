@@ -7,7 +7,6 @@ import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
@@ -63,16 +62,6 @@ class HubRouteSpringEventListenerTest {
     }
 
     @Test
-    @DisplayName("HubRouteBuildFailedEvent는 BEFORE_COMMIT에서 Outbox에 저장된다.")
-    void handleBeforeCommit_buildFailed_save() {
-        HubRouteBuildFailedEvent event = new HubRouteBuildFailedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.BRANCH, "failed");
-
-        hubRouteSpringEventListener.handleBeforeCommit(event);
-
-        then(outboxService).should().save(event);
-    }
-
-    @Test
     @DisplayName("HubRouteCreatedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
     void handleAfterCommit_created_publish() {
         HubRouteCreatedEvent event = createHubRouteCreatedEvent();
@@ -96,16 +85,6 @@ class HubRouteSpringEventListenerTest {
     @DisplayName("HubRouteBuildCompletedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
     void handleAfterCommit_buildCompleted_publish() {
         HubRouteBuildCompletedEvent event = new HubRouteBuildCompletedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.CENTER);
-
-        hubRouteSpringEventListener.handleAfterCommit(event);
-
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
-    }
-
-    @Test
-    @DisplayName("HubRouteBuildFailedEvent는 AFTER_COMMIT에서 Outbox 발행 처리된다.")
-    void handleAfterCommit_buildFailed_publish() {
-        HubRouteBuildFailedEvent event = new HubRouteBuildFailedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.BRANCH, "failed");
 
         hubRouteSpringEventListener.handleAfterCommit(event);
 

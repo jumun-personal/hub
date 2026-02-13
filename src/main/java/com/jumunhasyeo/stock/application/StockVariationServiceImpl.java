@@ -41,11 +41,9 @@ public class StockVariationServiceImpl implements StockVariationService {
     @Override
     public StockRes decrement(DecreaseStockCommand command) {
         Stock stock = getStock(command.productId());
-        entityManager.detach(stock);
-        stock.decrease(command.amount());
-        StockRes res = StockRes.from(stock);
+        StockRes preview = previewAfterDecrease(stock, command.amount());
         stockRepository.decreaseStock(stock.getStockId(), command.amount());
-        return res;
+        return preview;
     }
 
     @Override
@@ -61,11 +59,9 @@ public class StockVariationServiceImpl implements StockVariationService {
     @Override
     public StockRes increment(IncreaseStockCommand command) {
         Stock stock = getStock(command.productId());
-        entityManager.detach(stock);
-        stock.increase(command.amount());
-        StockRes res = StockRes.from(stock);
+        StockRes preview = previewAfterIncrease(stock, command.amount());
         stockRepository.increaseStock(stock.getStockId(), command.amount());
-        return res;
+        return preview;
     }
 
     @Override
@@ -108,6 +104,18 @@ public class StockVariationServiceImpl implements StockVariationService {
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION, "이미 처리된 재고 변경 요청입니다.", e);
         }
+    }
+
+    private StockRes previewAfterDecrease(Stock stock, int amount) {
+        entityManager.detach(stock);
+        stock.decrease(amount);
+        return StockRes.from(stock);
+    }
+
+    private StockRes previewAfterIncrease(Stock stock, int amount) {
+        entityManager.detach(stock);
+        stock.increase(amount);
+        return StockRes.from(stock);
     }
 
     private int findDecreaseAmount(UUID productId, List<DecreaseStockCommand> commands) {

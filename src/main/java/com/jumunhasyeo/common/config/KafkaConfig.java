@@ -16,6 +16,7 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.transaction.KafkaTransactionManager;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
@@ -37,6 +38,8 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    private static final String TRANSACTION_ID_PREFIX = "hub-route-tx-";
+
     @Bean
     public ProducerFactory<String, String> producerFactory() {
         Map<String, Object> configProps = new HashMap<>();
@@ -50,12 +53,23 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.ACKS_CONFIG, "all");
         configProps.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-        return new DefaultKafkaProducerFactory<>(configProps);
+        DefaultKafkaProducerFactory<String, String> producerFactory = new DefaultKafkaProducerFactory<>(configProps);
+        producerFactory.setTransactionIdPrefix(TRANSACTION_ID_PREFIX);
+        return producerFactory;
     }
 
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
+        KafkaTemplate<String, String> kafkaTemplate = new KafkaTemplate<>(producerFactory());
+        kafkaTemplate.setAllowNonTransactional(true);
+        return kafkaTemplate;
+    }
+
+    @Bean
+    public KafkaTransactionManager<String, String> kafkaTransactionManager(
+            ProducerFactory<String, String> producerFactory
+    ) {
+        return new KafkaTransactionManager<>(producerFactory);
     }
 
     @Bean
@@ -65,6 +79,7 @@ public class KafkaConfig {
         configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        configProps.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         return new DefaultKafkaConsumerFactory<>(configProps);
     }
@@ -106,12 +121,14 @@ public class KafkaConfig {
     @Bean(name = "hubRouteKafkaListenerContainerFactory")
     public ConcurrentKafkaListenerContainerFactory<String, String> hubRouteKafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,
-            HubRouteDlqRecoverer hubRouteDlqRecoverer
+            HubRouteDlqRecoverer hubRouteDlqRecoverer,
+            KafkaTransactionManager<String, String> kafkaTransactionManager
     ) {
         return buildListenerContainerFactory(
                 consumerFactory,
                 hubRouteDlqRecoverer.buildErrorHandler(),
-                ContainerProperties.AckMode.RECORD
+                ContainerProperties.AckMode.RECORD,
+                kafkaTransactionManager
         );
     }
 
@@ -120,10 +137,22 @@ public class KafkaConfig {
             CommonErrorHandler errorHandler,
             ContainerProperties.AckMode ackMode
     ) {
+        return buildListenerContainerFactory(consumerFactory, errorHandler, ackMode, null);
+    }
+
+    private ConcurrentKafkaListenerContainerFactory<String, String> buildListenerContainerFactory(
+            ConsumerFactory<String, String> consumerFactory,
+            CommonErrorHandler errorHandler,
+            ContainerProperties.AckMode ackMode,
+            KafkaTransactionManager<String, String> kafkaTransactionManager
+    ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ackMode);
         factory.setCommonErrorHandler(errorHandler);
+        if (kafkaTransactionManager != null) {
+            factory.getContainerProperties().setKafkaAwareTransactionManager(kafkaTransactionManager);
+        }
         return factory;
     }
 

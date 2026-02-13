@@ -16,8 +16,12 @@ import java.util.UUID;
 @Getter
 @Table(
         name = "p_outbox_events",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_outbox_event_key", columnNames = "event_key")
+        },
         indexes = {
-                @Index(name = "idx_outbox_event_key", columnList = "eventKey")
+                @Index(name = "idx_outbox_status_created_at", columnList = "status, created_at"),
+                @Index(name = "idx_outbox_status_claimed_at", columnList = "status, claimed_at")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -28,10 +32,10 @@ public class OutboxEvent extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(name = "event_name", nullable = false)
     private String eventName;
 
-    @Column(nullable = false)
+    @Column(name = "event_key", nullable = false)
     private String eventKey;
 
     @Column(nullable = false)
@@ -47,16 +51,16 @@ public class OutboxEvent extends BaseEntity {
     @Column(nullable = false)
     private Integer retryCount = 0;
 
-    @Column(nullable = false)
+    @Column(name = "max_retries", nullable = false)
     private Integer maxRetries = 3;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage = "";
 
-    @Column
+    @Column(name = "claimed_at")
     private LocalDateTime claimedAt;
 
-    @Column
+    @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
     private OutboxEvent(String eventName, String payload, OutboxStatus status, String eventKey, String topic) {

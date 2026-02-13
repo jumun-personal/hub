@@ -1,12 +1,11 @@
-package com.jumunhasyeo.common.Idempotency;
+package com.jumunhasyeo.common.Idempotency.db.domain;
 
-import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class DbIdempotentStatusTest {
+class IdempotentStatusTest {
 
 
     @Test

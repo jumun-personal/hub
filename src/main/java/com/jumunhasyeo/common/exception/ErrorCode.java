@@ -50,6 +50,7 @@ public enum ErrorCode {
     CANNOT_CREATE_ROUTE_SAME_HUB(HttpStatus.BAD_REQUEST, "EHRT002", "같은 허브끼리는 경로를 생성할 수 없습니다."),
     CANNOT_CREATE_ROUTE_FROM_DELETED_HUB(HttpStatus.BAD_REQUEST, "EHRT003", "삭제된 허브에서 경로를 생성할 수 없습니다."),
     CANNOT_CREATE_ROUTE_TO_DELETED_HUB(HttpStatus.BAD_REQUEST, "EHRT004", "삭제된 허브로 경로를 생성할 수 없습니다."),
+    HUB_ROUTE_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "EHRT005", "지도 API 장애로 허브 생성이 일시적으로 제한됩니다."),
 
     //API
     MAP_API_EXCEPTION(HttpStatus.INTERNAL_SERVER_ERROR, "EAM001", "지도 API 호출에 실패했습니다."),

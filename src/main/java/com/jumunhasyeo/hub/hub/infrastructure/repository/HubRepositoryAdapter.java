@@ -7,6 +7,7 @@ import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,5 +55,25 @@ public class HubRepositoryAdapter implements HubRepository {
     @Override
     public List<Hub> findAll() {
         return jpaHubRepository.findAll(HubStatus.COMPLETE);
+    }
+
+    @Override
+    public int completeIfPending(UUID hubId) {
+        return jpaHubRepository.completeIfPending(
+                hubId,
+                HubStatus.PENDING,
+                HubStatus.COMPLETE
+        );
+    }
+
+    @Override
+    public int failIfPending(UUID hubId, LocalDateTime deletedAt, Long deletedBy) {
+        return jpaHubRepository.failIfPending(
+                hubId,
+                HubStatus.PENDING,
+                HubStatus.FAILED,
+                deletedAt,
+                deletedBy
+        );
     }
 }

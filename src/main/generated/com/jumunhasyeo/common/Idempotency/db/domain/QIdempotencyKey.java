@@ -10,14 +10,14 @@ import com.querydsl.core.types.Path;
 
 
 /**
- * QDbIdempotentKey is a Querydsl query type for DbIdempotentKey
+ * QIdempotencyKey is a Querydsl query type for IdempotencyKey
  */
 @Generated("com.querydsl.codegen.DefaultEntitySerializer")
-public class QDbIdempotentKey extends EntityPathBase<DbIdempotentKey> {
+public class QIdempotencyKey extends EntityPathBase<IdempotencyKey> {
 
-    private static final long serialVersionUID = 1938282629L;
+    private static final long serialVersionUID = -49506639L;
 
-    public static final QDbIdempotentKey dbIdempotentKey = new QDbIdempotentKey("dbIdempotentKey");
+    public static final QIdempotencyKey idempotencyKey1 = new QIdempotencyKey("idempotencyKey1");
 
     public final DateTimePath<java.time.LocalDateTime> createdAt = createDateTime("createdAt", java.time.LocalDateTime.class);
 
@@ -33,16 +33,16 @@ public class QDbIdempotentKey extends EntityPathBase<DbIdempotentKey> {
 
     public final EnumPath<IdempotentType> type = createEnum("type", IdempotentType.class);
 
-    public QDbIdempotentKey(String variable) {
-        super(DbIdempotentKey.class, forVariable(variable));
+    public QIdempotencyKey(String variable) {
+        super(IdempotencyKey.class, forVariable(variable));
     }
 
-    public QDbIdempotentKey(Path<? extends DbIdempotentKey> path) {
+    public QIdempotencyKey(Path<? extends IdempotencyKey> path) {
         super(path.getType(), path.getMetadata());
     }
 
-    public QDbIdempotentKey(PathMetadata metadata) {
-        super(DbIdempotentKey.class, metadata);
+    public QIdempotencyKey(PathMetadata metadata) {
+        super(IdempotencyKey.class, metadata);
     }
 
 }

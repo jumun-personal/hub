@@ -2,8 +2,8 @@ package com.jumunhasyeo.common.Idempotency;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jumunhasyeo.common.Idempotency.db.application.DbIdempotentService;
-import com.jumunhasyeo.common.Idempotency.db.domain.DbIdempotentKey;
+import com.jumunhasyeo.common.Idempotency.db.application.PersistentIdempotencyService;
+import com.jumunhasyeo.common.Idempotency.db.domain.IdempotencyKey;
 import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.Idempotency.db.domain.repository.IdempotencyKeyRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,24 +24,24 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DbIdempotentServiceTest {
+class PersistentIdempotencyServiceTest {
 
     @Mock
     private IdempotencyKeyRepository repository;
 
     @InjectMocks
-    private DbIdempotentService service;
+    private PersistentIdempotencyService service;
     private final String payload = "";
 
     private ObjectMapper objectMapper;
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        service = new DbIdempotentService(repository, objectMapper);
+        service = new PersistentIdempotencyService(repository, objectMapper);
     }
 
-    private static DbIdempotentKey createKey(String key, IdempotentStatus status) {
-        return DbIdempotentKey.builder()
+    private static IdempotencyKey createKey(String key, IdempotentStatus status) {
+        return IdempotencyKey.builder()
                 .idempotencyKey(key)
                 .status(status)
                 .createdAt(LocalDateTime.now())
@@ -69,7 +69,7 @@ class DbIdempotentServiceTest {
     public void getCurrentStatus_existingKey_success() {
         // given
         String key = "ORDER-456";
-        DbIdempotentKey savedKey = createKey(key, IdempotentStatus.PROCESSING);
+        IdempotencyKey savedKey = createKey(key, IdempotentStatus.PROCESSING);
         when(repository.findByIdempotencyKeyAndNotExpired(eq(key), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(savedKey));
 
@@ -85,13 +85,13 @@ class DbIdempotentServiceTest {
     public void setIfAbsent_newKey_success() throws JsonProcessingException {
         // given
         String key = "ORDER-111";
-        when(repository.save(any(DbIdempotentKey.class))).thenReturn(createKey(key, IdempotentStatus.PROCESSING));
+        when(repository.save(any(IdempotencyKey.class))).thenReturn(createKey(key, IdempotentStatus.PROCESSING));
         // when
         Boolean result = service.setIfAbsent(key, IdempotentStatus.PROCESSING, 86400, payload);
 
         // then
         assertThat(result).isTrue();
-        verify(repository).save(any(DbIdempotentKey.class));
+        verify(repository).save(any(IdempotencyKey.class));
     }
 
     @Test
@@ -99,7 +99,7 @@ class DbIdempotentServiceTest {
     public void setIfAbsent_duplicateKey_shouldReturnFalse() throws JsonProcessingException {
         // given
         String key = "ORDER-222";
-        when(repository.save(any(DbIdempotentKey.class)))
+        when(repository.save(any(IdempotencyKey.class)))
                 .thenThrow(new DataIntegrityViolationException("Duplicate key"));
         // when
         Boolean result = service.setIfAbsent(key, IdempotentStatus.PROCESSING, 86400, payload);
@@ -113,7 +113,7 @@ class DbIdempotentServiceTest {
     public void saveStatus_existingKey_success() {
         // given
         String key = "ORDER-333";
-        DbIdempotentKey savedKey = createKey(key, IdempotentStatus.PROCESSING);
+        IdempotencyKey savedKey = createKey(key, IdempotentStatus.PROCESSING);
         when(repository.findByIdempotencyKeyAndNotExpired(eq(key), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(savedKey));
 
@@ -121,7 +121,7 @@ class DbIdempotentServiceTest {
         service.saveStatus(key, IdempotentStatus.SUCCESS, 86400);
 
         // then
-        verify(repository).save(any(DbIdempotentKey.class));
+        verify(repository).save(any(IdempotencyKey.class));
         assertThat(savedKey.getStatus()).isEqualTo(IdempotentStatus.SUCCESS);
     }
 
@@ -137,7 +137,7 @@ class DbIdempotentServiceTest {
         service.saveStatus(key, IdempotentStatus.SUCCESS, 86400);
 
         // then
-        verify(repository, never()).save(any(DbIdempotentKey.class));
+        verify(repository, never()).save(any(IdempotencyKey.class));
     }
 
     @Test
@@ -146,7 +146,7 @@ class DbIdempotentServiceTest {
         // given
         String key = "ORDER-555";
         String errorMsg = "Payment failed";
-        DbIdempotentKey savedKey = createKey(key, IdempotentStatus.PROCESSING);
+        IdempotencyKey savedKey = createKey(key, IdempotentStatus.PROCESSING);
         when(repository.findByIdempotencyKeyAndNotExpired(eq(key), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(savedKey));
 
@@ -154,7 +154,7 @@ class DbIdempotentServiceTest {
         service.saveError(key, errorMsg, 86400);
 
         // then
-        verify(repository).save(any(DbIdempotentKey.class));
+        verify(repository).save(any(IdempotencyKey.class));
         assertThat(savedKey.getErrorMessage()).isEqualTo(errorMsg);
         assertThat(savedKey.getStatus()).isEqualTo(IdempotentStatus.FAIL);
     }
@@ -171,6 +171,6 @@ class DbIdempotentServiceTest {
         service.saveError(key, "Error", 86400);
 
         // then
-        verify(repository, never()).save(any(DbIdempotentKey.class));
+        verify(repository, never()).save(any(IdempotencyKey.class));
     }
 }

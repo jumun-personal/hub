@@ -9,7 +9,9 @@ import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.external.KakaoWeightRouteApiServiceImpl;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.external.NaverWeightRouteApiServiceImpl;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.springboot3.circuitbreaker.autoconfigure.CircuitBreakerAutoConfiguration;
+import io.github.resilience4j.springboot3.ratelimiter.autoconfigure.RateLimiterAutoConfiguration;
 import io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +21,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -34,6 +37,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 
 @SpringJUnitConfig
 @ContextConfiguration(classes = {
@@ -43,20 +47,22 @@ import static org.mockito.Mockito.reset;
 @ImportAutoConfiguration({
         AopAutoConfiguration.class,
         CircuitBreakerAutoConfiguration.class,
-        RetryAutoConfiguration.class
+        RetryAutoConfiguration.class,
+        RateLimiterAutoConfiguration.class
 })
 @TestPropertySource(properties = {
-        "resilience4j.retry.instances.kakaoRoute.maxAttempts=3",
-        "resilience4j.retry.instances.kakaoRoute.waitDuration=1ms",
-        "resilience4j.retry.instances.naverRoute.maxAttempts=1",
-        "resilience4j.retry.instances.naverRoute.waitDuration=1ms",
+        "resilience4j.retry.instances.routeResolve.maxAttempts=3",
+        "resilience4j.retry.instances.routeResolve.waitDuration=1ms",
         "resilience4j.circuitbreaker.instances.kakaoRoute.slidingWindowSize=5",
-        "resilience4j.circuitbreaker.instances.kakaoRoute.minimumNumberOfCalls=5",
+        "resilience4j.circuitbreaker.instances.kakaoRoute.minimumNumberOfCalls=10",
         "resilience4j.circuitbreaker.instances.kakaoRoute.failureRateThreshold=50",
         "resilience4j.circuitbreaker.instances.kakaoRoute.waitDurationInOpenState=60s",
-        "resilience4j.circuitbreaker.instances.naverRoute.slidingWindowSize=2",
-        "resilience4j.circuitbreaker.instances.naverRoute.minimumNumberOfCalls=2",
-        "resilience4j.circuitbreaker.instances.naverRoute.failureRateThreshold=50"
+        "resilience4j.ratelimiter.instances.kakaoRoute.limitForPeriod=1000",
+        "resilience4j.ratelimiter.instances.kakaoRoute.limitRefreshPeriod=1s",
+        "resilience4j.ratelimiter.instances.kakaoRoute.timeoutDuration=0ms",
+        "resilience4j.ratelimiter.instances.naverRoute.limitForPeriod=1000",
+        "resilience4j.ratelimiter.instances.naverRoute.limitRefreshPeriod=1s",
+        "resilience4j.ratelimiter.instances.naverRoute.timeoutDuration=0ms"
 })
 class ResilientRouteWeightApiServiceTest {
 
@@ -72,16 +78,21 @@ class ResilientRouteWeightApiServiceTest {
     @Autowired
     private CircuitBreakerRegistry circuitBreakerRegistry;
 
+    @Autowired
+    private RateLimiterRegistry rateLimiterRegistry;
+
+    @Autowired
+    private RouteProviderAvailabilityService routeProviderAvailabilityService;
+
     @BeforeEach
     void setUp() {
-        reset(kakaoStrategy, naverStrategy);
+        reset(kakaoStrategy, naverStrategy, routeProviderAvailabilityService);
         circuitBreakerRegistry.circuitBreaker("kakaoRoute").reset();
-        circuitBreakerRegistry.circuitBreaker("naverRoute").reset();
     }
 
     @Test
-    @DisplayName("Kakao 호출이 계속 실패하면 retry 이후 Naver fallback을 수행한다.")
-    void getRouteInfo_whenKakaoFails_retriesThenFallbackToNaver() {
+    @DisplayName("Kakao 호출이 실패하면 Naver fallback을 수행하고 전체 retry는 수행하지 않는다")
+    void getRouteInfo_whenKakaoFails_fallbackToNaverWithoutWholeRetry() {
         // given
         RouteWeightQuery query = routeWeightQuery();
         RouteWeightResult naverResult = routeWeightResult(MapProvider.NAVER);
@@ -94,8 +105,15 @@ class ResilientRouteWeightApiServiceTest {
         // then
         assertThat(result.provider()).isEqualTo(MapProvider.NAVER);
         assertThat(result.fromFallback()).isTrue();
-        then(kakaoStrategy).should(org.mockito.Mockito.times(3)).getWeight(any());
+        then(kakaoStrategy).should(times(1)).getWeight(any());
         then(naverStrategy).should().getWeight(any());
+        assertThat(circuitBreakerRegistry.circuitBreaker("kakaoRoute")
+                .getMetrics()
+                .getNumberOfFailedCalls())
+                .isEqualTo(1);
+        assertThat(circuitBreakerRegistry.find("naverRoute")).isEmpty();
+        then(routeProviderAvailabilityService).should().clearAllProvidersUnavailable();
+        then(routeProviderAvailabilityService).should(never()).markAllProvidersUnavailable(any());
     }
 
     @Test
@@ -115,11 +133,12 @@ class ResilientRouteWeightApiServiceTest {
         assertThat(result.fromFallback()).isTrue();
         then(kakaoStrategy).should(never()).getWeight(any());
         then(naverStrategy).should().getWeight(any());
+        then(routeProviderAvailabilityService).should().clearAllProvidersUnavailable();
     }
 
     @Test
-    @DisplayName("Naver fallback까지 실패하면 최종 예외가 전파된다.")
-    void getRouteInfo_whenFallbackFails_throwsException() {
+    @DisplayName("Naver fallback까지 실패하면 전체 흐름을 retry한 뒤 최종 예외가 전파된다")
+    void getRouteInfo_whenFallbackFails_retriesWholeFlowThenThrowsException() {
         // given
         RouteWeightQuery query = routeWeightQuery();
         circuitBreakerRegistry.circuitBreaker("kakaoRoute").transitionToOpenState();
@@ -129,6 +148,43 @@ class ResilientRouteWeightApiServiceTest {
         assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("naver down");
+        then(kakaoStrategy).should(never()).getWeight(any());
+        then(naverStrategy).should(times(3)).getWeight(any());
+        then(routeProviderAvailabilityService).should().markAllProvidersUnavailable(any());
+        then(routeProviderAvailabilityService).should(never()).clearAllProvidersUnavailable();
+    }
+
+    @Test
+    @DisplayName("Naver fallback 실패 시 Kakao부터 시작하는 전체 경로 조회를 retry한다")
+    void getRouteInfo_whenKakaoAndFallbackFail_retriesFromKakao() {
+        // given
+        RouteWeightQuery query = routeWeightQuery();
+        given(kakaoStrategy.getWeight(any())).willThrow(new RuntimeException("kakao down"));
+        given(naverStrategy.getWeight(any())).willThrow(new RuntimeException("naver down"));
+
+        // when & then
+        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("naver down");
+        then(kakaoStrategy).should(times(3)).getWeight(any());
+        then(naverStrategy).should(times(3)).getWeight(any());
+        then(routeProviderAvailabilityService).should().markAllProvidersUnavailable(any());
+    }
+
+    @Test
+    @DisplayName("Kakao와 Naver TPS는 독립 RateLimiter 설정으로 제어한다")
+    void routeProviders_useIndependentRateLimitersForTpsControl() {
+        // when
+        int kakaoLimitForPeriod = rateLimiterRegistry.rateLimiter("kakaoRoute")
+                .getRateLimiterConfig()
+                .getLimitForPeriod();
+        int naverLimitForPeriod = rateLimiterRegistry.rateLimiter("naverRoute")
+                .getRateLimiterConfig()
+                .getLimitForPeriod();
+
+        // then
+        assertThat(kakaoLimitForPeriod).isEqualTo(1000);
+        assertThat(naverLimitForPeriod).isEqualTo(1000);
     }
 
     private static RouteWeightQuery routeWeightQuery() {
@@ -161,6 +217,12 @@ class ResilientRouteWeightApiServiceTest {
         @Bean
         NaverWeightRouteApiServiceImpl naverStrategy() {
             return mock(NaverWeightRouteApiServiceImpl.class);
+        }
+
+        @Bean
+        @Primary
+        RouteProviderAvailabilityService routeProviderAvailabilityService() {
+            return mock(RouteProviderAvailabilityService.class);
         }
     }
 }

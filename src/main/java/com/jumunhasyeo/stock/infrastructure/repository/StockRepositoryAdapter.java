@@ -20,7 +20,9 @@ public class StockRepositoryAdapter implements StockRepository {
 
     @Override
     public Optional<Stock> findByProductId(UUID productId) {
-        return Optional.ofNullable(jpaStockRepository.findByProductId(productId).get(0));
+        return jpaStockRepository.findByProductId(productId)
+                .stream()
+                .findFirst();
     }
 
     @Override
@@ -31,16 +33,18 @@ public class StockRepositoryAdapter implements StockRepository {
     @Override
     public boolean decreaseStock(UUID stockId, int amount) {
         boolean isSuccess = jpaStockRepository.decreaseStock(stockId, amount) == 1;
-        if (!isSuccess)
+        if (!isSuccess) {
             throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+        }
         return isSuccess;
     }
 
     @Override
     public boolean increaseStock(UUID stockId, int amount) {
         boolean isSuccess = jpaStockRepository.increaseStock(stockId, amount) == 1;
-        if (!isSuccess)
+        if (!isSuccess) {
             throw new BusinessException(ErrorCode.STOCK_MAX_EXCEEDED);
+        }
         return isSuccess;
     }
 

@@ -191,14 +191,13 @@ class HubRouteServiceTest {
     }
 
     @Test
-    @DisplayName("허브가 없으면 실패 이벤트를 발행한다.")
+    @DisplayName("허브가 없으면 예외를 전파하고 실패 이벤트를 직접 발행하지 않는다.")
     void build_routes_hub_not_found() {
         BuildRouteCommand command = new BuildRouteCommand(null, UUID.randomUUID(), "센터", center1.getAddress(), HubType.CENTER);
         when(hubRepository.findByIdIncludingCreating(command.hubId())).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> hubRouteService.buildRoutesForNewHub(command));
 
-        verify(hubRouteEventPublisher, never()).publishRouteBuildFailed(any(), any());
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteRepository, never()).insertIgnore(any(Set.class));
     }

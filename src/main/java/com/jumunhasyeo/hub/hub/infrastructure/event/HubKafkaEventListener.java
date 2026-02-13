@@ -8,7 +8,6 @@ import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
 import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -57,9 +56,6 @@ public class HubKafkaEventListener {
         } else if (simpleClassName.equals(HUB_ROUTE_BUILD_COMPLETED_EVENT.getEventName())) {
             HubRouteBuildCompletedEvent event = objectMapper.readValue(payload, HubRouteBuildCompletedEvent.class);
             hubCreationSagaService.complete(event.getHubId());
-        } else if (simpleClassName.equals(HUB_ROUTE_BUILD_FAILED_EVENT.getEventName())) {
-            HubRouteBuildFailedEvent event = objectMapper.readValue(payload, HubRouteBuildFailedEvent.class);
-            hubCreationSagaService.compensate(event.getHubId(), event.getReason());
         } else {
             return;
         }

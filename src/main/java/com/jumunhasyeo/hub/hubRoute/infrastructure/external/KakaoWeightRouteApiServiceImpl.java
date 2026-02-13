@@ -31,8 +31,6 @@ public class KakaoWeightRouteApiServiceImpl implements RouteWeightStrategy {
      */
     public RouteWeightResult getWeight(RouteWeightQuery query){
         try {
-            Thread.sleep(300); // TODO 카카오 API 초당  제한 대응
-
             // Kakao API 형식: "경도,위도" (longitude,latitude)
             Coordinate start = query.start();
             Coordinate end = query.end();

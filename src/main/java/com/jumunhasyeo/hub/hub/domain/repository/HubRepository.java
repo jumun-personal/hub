@@ -3,6 +3,7 @@ package com.jumunhasyeo.hub.hub.domain.repository;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,4 +17,6 @@ public interface HubRepository {
     long count();
     List<Hub> findAllByHubType(HubType type);
     List<Hub> findAll();
+    int completeIfPending(UUID hubId);
+    int failIfPending(UUID hubId, LocalDateTime deletedAt, Long deletedBy);
 }

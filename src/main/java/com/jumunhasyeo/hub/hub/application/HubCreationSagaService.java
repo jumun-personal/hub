@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -27,36 +28,29 @@ public class HubCreationSagaService {
 
     @Transactional
     public void complete(UUID hubId) {
-        Hub hub = hubRepository.findByIdIncludingCreating(hubId)
+        Hub hub = hubRepository.findByIdIncludingDeleted(hubId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-        if (hub.isDeleted()) {
-            log.info("Hub already deleted, skip completion. hubId={}", hubId);
+        int updated = hubRepository.completeIfPending(hubId);
+        if (updated == 1) {
+            log.info("Hub route build completed. hubId={}", hubId);
             return;
         }
-        if (hub.isActive()) {
-            log.info("Hub already active, skip completion. hubId={}", hubId);
-            return;
-        }
-        hub.activate();
-        hubRepository.save(hub);
+        log.info("Hub completion skipped. hubId={}, status={}, deleted={}", hubId, hub.getStatus(), hub.isDeleted());
     }
 
     @Transactional
     public void compensate(UUID hubId, String reason) {
-        Hub hub = hubRepository.findByIdIncludingCreating(hubId)
+        Hub hub = hubRepository.findByIdIncludingDeleted(hubId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-        if (hub.isDeleted()) {
-            log.info("Hub already deleted, skip compensation. hubId={}", hubId);
+
+        int updated = hubRepository.failIfPending(hubId, LocalDateTime.now(), deletedBy);
+        if (updated == 0) {
+            log.info("Hub compensation skipped. hubId={}, status={}, deleted={}", hubId, hub.getStatus(), hub.isDeleted());
             return;
         }
-        if (hub.isActive()) {
-            log.info("Hub already active, skip compensation. hubId={}", hubId);
-            return;
-        }
+
         log.warn("Compensating hub creation. hubId={}, reason={}", hubId, reason);
         hubRelationRepository.deleteByHubId(hubId);
-        hub.markFailed(deletedBy);
-        hubRepository.save(hub);
         hubEventPublisher.publishEvent(HubDeletedEvent.from(hub, deletedBy));
     }
 }

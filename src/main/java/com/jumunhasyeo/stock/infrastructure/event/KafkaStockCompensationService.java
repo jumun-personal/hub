@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-import static com.jumunhasyeo.common.exception.ErrorCode.PROCESSING_CONFLICT_EXCEPTION;
 import static com.jumunhasyeo.common.exception.ErrorCode.SUCCESS_CONFLICT_EXCEPTION;
 
 @Service
@@ -23,8 +22,7 @@ public class KafkaStockCompensationService {
         try {
             stockService.increment(compensationKey, commandList);
         } catch (BusinessException e) {
-            if (SUCCESS_CONFLICT_EXCEPTION.equals(e.getErrorCode())
-                    || PROCESSING_CONFLICT_EXCEPTION.equals(e.getErrorCode())) {
+            if (SUCCESS_CONFLICT_EXCEPTION.equals(e.getErrorCode())) {
                 log.info("Ignore already completed stock compensation. key={}", compensationKey);
                 return;
             }

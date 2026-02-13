@@ -6,11 +6,13 @@ import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -84,6 +86,12 @@ class HubServiceConfigTest {
         @Bean
         HubEventPublisher hubEventPublisher() {
             return mock(HubEventPublisher.class);
+        }
+
+        @Bean
+        @Primary
+        RouteProviderAvailabilityService routeProviderAvailabilityService() {
+            return mock(RouteProviderAvailabilityService.class);
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.jumunhasyeo.stock.application;
 
-import com.jumunhasyeo.common.Idempotency.DbIdempotent;
+import com.jumunhasyeo.common.Idempotency.Idempotent;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.*;
@@ -18,6 +18,9 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class StockService {
+    private static final long STOCK_PROCESSING_TTL_SECONDS = 300L;
+    private static final long STOCK_SUCCESS_TTL_SECONDS = 86_400L;
+
     private final StockVariationService stockVariationService;
     private final StockRepository stockRepository;
     private final HubClient hubClient;
@@ -49,7 +52,10 @@ public class StockService {
     }
 
     //상품 재고 감소
-    @DbIdempotent(ttlDays = 1)
+    @Idempotent(
+            processingTtlSeconds = STOCK_PROCESSING_TTL_SECONDS,
+            successTtlSeconds = STOCK_SUCCESS_TTL_SECONDS
+    )
     public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commandList){
         List<DecreaseStockCommand> sortedList = new ArrayList<>(commandList);
         sortedList.sort(Comparator.comparing(DecreaseStockCommand::productId));
@@ -58,7 +64,10 @@ public class StockService {
     }
 
     //상품 재고 증가
-    @DbIdempotent(ttlDays = 1)
+    @Idempotent(
+            processingTtlSeconds = STOCK_PROCESSING_TTL_SECONDS,
+            successTtlSeconds = STOCK_SUCCESS_TTL_SECONDS
+    )
     public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commandList){
         List<IncreaseStockCommand> sortedList = new ArrayList<>(commandList);
         sortedList.sort(Comparator.comparing(IncreaseStockCommand::productId));

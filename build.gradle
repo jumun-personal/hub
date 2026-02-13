@@ -88,7 +88,13 @@ dependencies {
     implementation 'net.javacrumbs.shedlock:shedlock-spring:5.9.0'
     implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.9.0'
     // passport 의존성 추가
-    implementation 'com.library:passport:1.0.3'
+    def hasGitHubPackageCredentials = (project.findProperty("gpr.user") ?: System.getenv("GITHUB_USERNAME")) &&
+            (project.findProperty("gpr.token") ?: System.getenv("GITHUB_TOKEN"))
+    if (hasGitHubPackageCredentials) {
+        implementation 'com.library:passport:1.0.3'
+    } else {
+        implementation project(':passport-stub')
+    }
     implementation 'com.google.protobuf:protobuf-java:3.21.12'
     // Spring Cloud OpenFeign
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'

@@ -1,6 +1,6 @@
 package com.jumunhasyeo.common.scheduler;
 
-import com.jumunhasyeo.common.Idempotency.db.domain.DbIdempotentKey;
+import com.jumunhasyeo.common.Idempotency.db.domain.IdempotencyKey;
 import com.jumunhasyeo.common.Idempotency.db.domain.repository.IdempotencyKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class IdempotentScheduler {
         log.info("Starting cleanup of expired idempotency keys");
 
         LocalDateTime now = LocalDateTime.now();
-        List<DbIdempotentKey> expiredKeys = repository.findExpiredKeys(now);
+        List<IdempotencyKey> expiredKeys = repository.findExpiredKeys(now);
 
         if (!expiredKeys.isEmpty()) {
             repository.deleteAll(expiredKeys);
@@ -56,7 +56,7 @@ public class IdempotentScheduler {
         log.debug("Checking for stale PROCESSING keys");
 
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(10);
-        List<DbIdempotentKey> staleKeys = repository.findStaleProcessingKeys(threshold);
+        List<IdempotencyKey> staleKeys = repository.findStaleProcessingKeys(threshold);
 
         if (!staleKeys.isEmpty()) {
             staleKeys.forEach(key -> {

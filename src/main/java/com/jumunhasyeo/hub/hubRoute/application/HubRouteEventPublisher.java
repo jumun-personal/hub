@@ -10,5 +10,4 @@ public interface HubRouteEventPublisher {
     void publishRouteCreatedEvent(List<HubRouteCreatedEvent> eventList);
     void publishRouteDeletedEvent(List<HubRouteDeletedEvent> eventList);
     void publishRouteBuildCompleted(BuildRouteCommand command);
-    void publishRouteBuildFailed(BuildRouteCommand command, String reason);
 }

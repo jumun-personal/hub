@@ -6,6 +6,7 @@ import com.jumunhasyeo.hub.hub.infrastructure.event.HubKafkaEventListener;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.event.HubRouteDlqRecoverer;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.event.HubRouteKafkaEventListener;
 import com.jumunhasyeo.stock.infrastructure.event.KafkaStockEventListener;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,10 +16,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.classify.BinaryExceptionClassifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.transaction.KafkaTransactionManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
@@ -37,6 +40,9 @@ class KafkaConfigTest {
 
     @Mock
     private HubRouteDlqRecoverer hubRouteDlqRecoverer;
+
+    @Mock
+    private KafkaTransactionManager<String, String> kafkaTransactionManager;
 
     private KafkaConfig kafkaConfig;
 
@@ -64,12 +70,18 @@ class KafkaConfigTest {
         given(hubRouteDlqRecoverer.buildErrorHandler()).willReturn(errorHandler);
 
         var commonFactory = kafkaConfig.kafkaListenerContainerFactory(consumerFactory, errorHandler);
-        var hubRouteFactory = kafkaConfig.hubRouteKafkaListenerContainerFactory(consumerFactory, hubRouteDlqRecoverer);
+        var hubRouteFactory = kafkaConfig.hubRouteKafkaListenerContainerFactory(
+                consumerFactory,
+                hubRouteDlqRecoverer,
+                kafkaTransactionManager
+        );
 
         assertThat(commonFactory.getContainerProperties().getAckMode())
                 .isEqualTo(ContainerProperties.AckMode.RECORD);
         assertThat(hubRouteFactory.getContainerProperties().getAckMode())
                 .isEqualTo(ContainerProperties.AckMode.RECORD);
+        assertThat(hubRouteFactory.getContainerProperties().getKafkaAwareTransactionManager())
+                .isSameAs(kafkaTransactionManager);
     }
 
     @Test
@@ -106,7 +118,7 @@ class KafkaConfigTest {
 
     @Test
     @DisplayName("producer factory는 idempotence와 안전한 전송 설정을 사용한다")
-    void producerFactory_usesIdempotenceCompatibleSettings() {
+    void producerFactory_usesIdempotenceCompatibleTransactionalSettings() {
         DefaultKafkaProducerFactory<String, String> producerFactory =
                 (DefaultKafkaProducerFactory<String, String>) kafkaConfig.producerFactory();
 
@@ -116,5 +128,29 @@ class KafkaConfigTest {
                 .containsEntry("enable.idempotence", true)
                 .containsEntry("acks", "all")
                 .containsEntry("max.in.flight.requests.per.connection", 5);
+        assertThat(producerFactory.getTransactionIdPrefix())
+                .isEqualTo("hub-route-tx-");
+    }
+
+    @Test
+    @DisplayName("consumer factory는 커밋된 메시지만 읽도록 설정한다")
+    void consumerFactory_readsCommittedMessagesOnly() {
+        DefaultKafkaConsumerFactory<String, String> consumerFactory =
+                (DefaultKafkaConsumerFactory<String, String>) kafkaConfig.consumerFactory();
+
+        Map<String, Object> configs = consumerFactory.getConfigurationProperties();
+
+        assertThat(configs)
+                .containsEntry(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false)
+                .containsEntry(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+    }
+
+    @Test
+    @DisplayName("KafkaTemplate은 Outbox 비트랜잭션 발행도 허용한다")
+    void kafkaTemplate_allowsNonTransactionalSend() {
+        KafkaTemplate<String, String> kafkaTemplate = kafkaConfig.kafkaTemplate();
+
+        assertThat(kafkaTemplate.isAllowNonTransactional())
+                .isTrue();
     }
 }

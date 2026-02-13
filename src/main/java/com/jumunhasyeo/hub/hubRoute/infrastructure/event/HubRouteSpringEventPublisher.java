@@ -3,7 +3,6 @@ package com.jumunhasyeo.hub.hubRoute.infrastructure.event;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -34,10 +33,5 @@ public class HubRouteSpringEventPublisher implements HubRouteEventPublisher {
     @Override
     public void publishRouteBuildCompleted(BuildRouteCommand command) {
         applicationEventPublisher.publishEvent(HubRouteBuildCompletedEvent.from(command));
-    }
-
-    @Override
-    public void publishRouteBuildFailed(BuildRouteCommand command, String reason) {
-        applicationEventPublisher.publishEvent(HubRouteBuildFailedEvent.from(command, reason));
     }
 }

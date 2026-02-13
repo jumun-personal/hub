@@ -20,6 +20,7 @@ import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,8 @@ public class HubServiceImplTest {
     private HubRepositoryCustom hubRepositoryCustom;
     @Mock
     private HubEventPublisher eventPublisher;
+    @Mock
+    private RouteProviderAvailabilityService routeProviderAvailabilityService;
     @InjectMocks
     private HubServiceImpl hubService;
 
@@ -93,6 +97,27 @@ public class HubServiceImplTest {
                 ArgumentCaptor.forClass(HubCreatedEvent.class);
         //then
         verify(eventPublisher).publishEvent(eventCaptor.capture());
+    }
+
+    @Test
+    @DisplayName("지도 Provider가 모두 실패한 상태면 hub 생성과 이벤트 발행을 차단한다")
+    void create_whenRouteProvidersUnavailable_blocksHubCreation() {
+        // given
+        CreateHubCommand command = CreateHubCommand.createCenter("이름", "주소", 12.7, 12.7, HubType.CENTER);
+        doThrow(new BusinessException(ErrorCode.HUB_ROUTE_PROVIDER_UNAVAILABLE))
+                .when(routeProviderAvailabilityService)
+                .assertRouteCreationAvailable();
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> hubService.create(command)
+        );
+
+        // then
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.HUB_ROUTE_PROVIDER_UNAVAILABLE);
+        verify(hubRepository, never()).save(any(Hub.class));
+        verify(eventPublisher, never()).publishEvent(any(HubCreatedEvent.class));
     }
 
     @Test

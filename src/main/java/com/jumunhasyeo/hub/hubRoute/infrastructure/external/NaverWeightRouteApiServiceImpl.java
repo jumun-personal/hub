@@ -9,8 +9,6 @@ import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightStrategy;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.external.client.map.NaverMapClient;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.response.NaverRouteResponse;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,8 +30,6 @@ public class NaverWeightRouteApiServiceImpl implements RouteWeightStrategy {
     private String apiKey;
 
     @Override
-    @Retry(name = "naverRoute")
-    @CircuitBreaker(name = "naverRoute")
     public RouteWeightResult getWeight(RouteWeightQuery query) {
         try {
             Coordinate start = query.start();

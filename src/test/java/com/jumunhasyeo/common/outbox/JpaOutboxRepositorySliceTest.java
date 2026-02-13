@@ -4,12 +4,14 @@ import com.jumunhasyeo.testsupport.RepositorySliceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JpaOutboxRepositorySliceTest extends RepositorySliceTest {
 
@@ -43,6 +45,19 @@ class JpaOutboxRepositorySliceTest extends RepositorySliceTest {
         //then
         assertThat(foundEvent).isPresent();
         assertThat(foundEvent.get().getEventKey()).isEqualTo("test-key-2");
+    }
+
+    @Test
+    @DisplayName("Outbox eventKey는 중복 저장할 수 없다.")
+    void save_WhenEventKeyDuplicated_throwsException() {
+        // given
+        OutboxEvent event = createOutboxEvent("duplicated-key");
+        OutboxEvent duplicatedEvent = createOutboxEvent("duplicated-key");
+        testEntityManager.persistAndFlush(event);
+
+        // when & then
+        assertThatThrownBy(() -> jpaOutboxRepository.saveAndFlush(duplicatedEvent))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

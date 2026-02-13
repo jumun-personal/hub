@@ -8,12 +8,17 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface DbIdempotent {
+public @interface Idempotent {
 
     /**
-     * TTL (일 단위)
+     * 처리 중 상태 TTL (초 단위)
      */
-    int ttlDays() default 7;
+    long processingTtlSeconds() default 300;
+
+    /**
+     * 성공 상태 TTL (초 단위)
+     */
+    long successTtlSeconds() default 86_400;
 
     /**
      * 멱등키 namespace prefix

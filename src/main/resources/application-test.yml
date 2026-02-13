@@ -112,14 +112,14 @@ naver:
 hub:
   compensation:
     deleted-by: 0
+  route:
+    provider-unavailable-ttl: 30s
 
 # Resilience4j 비활성화
 resilience4j:
   circuitbreaker:
     instances:
       kakaoRoute:
-        baseConfig: default
-      naverRoute:
         baseConfig: default
     configs:
       default:
@@ -129,13 +129,21 @@ resilience4j:
         failureRateThreshold: 100  # 항상 닫힌 상태 유지
   retry:
     instances:
-      kakaoRoute:
-        baseConfig: default
-      naverRoute:
+      routeResolve:
         baseConfig: default
     configs:
       default:
         maxAttempts: 1  # 재시도 비활성화
+  ratelimiter:
+    instances:
+      kakaoRoute:
+        limitForPeriod: 100000
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0ms
+      naverRoute:
+        limitForPeriod: 100000
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0ms
 
 # 모니터링 완전 비활성화
 management:

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,20 +42,6 @@ class HubKafkaEventListenerTest {
         hubKafkaEventListener.dispatch(payload, simpleClassName);
 
         then(hubCreationSagaService).should().complete(event.getHubId());
-    }
-
-    @Test
-    @DisplayName("HubRouteBuildFailedEvent를 처리하면 saga compensate가 호출된다")
-    void dispatch_buildFailed_callsCompensate() throws Exception {
-        String payload = "{}";
-        String simpleClassName = "HubRouteBuildFailedEvent";
-        HubRouteBuildFailedEvent event =
-                new HubRouteBuildFailedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.BRANCH, "reason");
-        given(objectMapper.readValue(payload, HubRouteBuildFailedEvent.class)).willReturn(event);
-
-        hubKafkaEventListener.dispatch(payload, simpleClassName);
-
-        then(hubCreationSagaService).should().compensate(event.getHubId(), event.getReason());
     }
 
     @Test

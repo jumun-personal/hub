@@ -16,6 +16,7 @@ import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,9 +33,12 @@ public class HubServiceImpl implements HubService{
     private final HubRepository hubRepository;
     private final HubRepositoryCustom hubRepositoryCustom;
     private final HubEventPublisher hubEventPublisher;
+    private final RouteProviderAvailabilityService routeProviderAvailabilityService;
 
     @Transactional
     public HubRes create(CreateHubCommand command) {
+        routeProviderAvailabilityService.assertRouteCreationAvailable();
+
         Coordinate coordinate = Coordinate.of(command.latitude(), command.longitude());
         Address address = Address.of(command.address(), coordinate);
         Hub hub = Hub.of(command.name(), address, command.hubType());

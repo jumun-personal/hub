@@ -1,1 +1,2 @@
 rootProject.name = 'hub_prodcut_stock_company'
+include 'passport-stub'

@@ -4,7 +4,6 @@ import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDomainEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -22,10 +21,9 @@ public class HubRouteSpringEventListener {
         outboxService.save(event);
     }
 
-    @Async("eventExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleAfterCommit(HubRouteDomainEvent event) {
-        log.info("async {} received key={}", event.eventName(), event.eventKey());
+        log.info("afterCommit {} received key={}", event.eventName(), event.eventKey());
         outboxService.publishAfterCommit(event.eventKey());
     }
 }

@@ -5,6 +5,7 @@ import com.jumunhasyeo.hub.hub.application.HubRedisCachedDecoratorService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -19,10 +20,16 @@ public class HubDynamicServiceConfig {
     public HubServiceImpl hubServiceImpl(
             HubRepository hubRepository,
             HubRepositoryCustom hubRepositoryCustom,
-            HubEventPublisher hubEventPublisher
+            HubEventPublisher hubEventPublisher,
+            RouteProviderAvailabilityService routeProviderAvailabilityService
     ) {
         log.info("[Dynamic] Creating HubServiceImpl");
-        return new HubServiceImpl(hubRepository, hubRepositoryCustom, hubEventPublisher);
+        return new HubServiceImpl(
+                hubRepository,
+                hubRepositoryCustom,
+                hubEventPublisher,
+                routeProviderAvailabilityService
+        );
     }
 
     @Bean
