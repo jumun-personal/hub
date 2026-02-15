@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
+import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -7,8 +8,6 @@ import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
-import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
-import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
@@ -26,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -46,11 +46,11 @@ class HubRouteServiceTest {
     @Mock
     private HubRepository hubRepository;
     @Mock
-    private RouteWeightApiService routeWeightApi;
-    @Mock
     private HubRouteRepository hubRouteRepository;
     @Mock
     private HubRouteEventPublisher hubRouteEventPublisher;
+    @Mock
+    private HubCreationSagaService hubCreationSagaService;
 
     private HubRouteService hubRouteService;
     private HubRouteDomainService hubRouteDomainService;
@@ -64,10 +64,10 @@ class HubRouteServiceTest {
         hubRouteDomainService = new HubRouteDomainService();
         hubRouteService = new HubRouteService(
                 hubRepository,
-                routeWeightApi,
                 hubRouteRepository,
                 hubRouteDomainService,
-                hubRouteEventPublisher
+                hubRouteEventPublisher,
+                hubCreationSagaService
         );
         center1 = hub(UUID.randomUUID(), "센터1", HubType.CENTER, 37.5, 127.0);
         center2 = hub(UUID.randomUUID(), "센터2", HubType.CENTER, 35.8, 128.6);
@@ -76,44 +76,33 @@ class HubRouteServiceTest {
     }
 
     @Test
-    @DisplayName("CENTER 허브 생성 시 경로를 생성하고 이벤트를 발행한다.")
+    @DisplayName("CENTER 허브 생성 시 외부 API 호출 없이 PENDING 경로 skeleton만 저장한다.")
     void build_routes_for_center_success() {
         BuildRouteCommand command = new BuildRouteCommand(null, center1.getHubId(), center1.getName(), center1.getAddress(), HubType.CENTER);
         when(hubRepository.findByIdIncludingCreating(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRepository.findAllByHubType(HubType.CENTER)).thenReturn(List.of(center1, center2));
         when(hubRouteRepository.findByStartHubOrEndHub(center1, center1)).thenReturn(List.of());
-        when(routeWeightApi.getRouteInfo(any()))
-                .thenReturn(routeWeightResult(11.9, 32));
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(routeWeightApi).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
-        ArgumentCaptor<List<HubRouteCreatedEvent>> captor = ArgumentCaptor.forClass(List.class);
-        verify(hubRouteEventPublisher).publishRouteCreatedEvent(captor.capture());
-        assertThat(captor.getValue()).hasSize(2);
-        assertThat(captor.getValue())
-                .allSatisfy(event -> assertThat(event.getHubId()).isEqualTo(command.hubId()));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
-    @DisplayName("BRANCH 허브 생성 시 경로를 생성하고 이벤트를 발행한다.")
+    @DisplayName("BRANCH 허브 생성 시 외부 API 호출 없이 PENDING 경로 skeleton만 저장한다.")
     void build_routes_for_branch_success() {
         BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
         when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
         when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRouteRepository.findByStartHubOrEndHub(branch, branch)).thenReturn(List.of());
-        when(routeWeightApi.getRouteInfo(any()))
-                .thenReturn(routeWeightResult(7.2, 19));
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(routeWeightApi).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
-        ArgumentCaptor<List<HubRouteCreatedEvent>> captor = ArgumentCaptor.forClass(List.class);
-        verify(hubRouteEventPublisher).publishRouteCreatedEvent(captor.capture());
-        assertThat(captor.getValue())
-                .allSatisfy(event -> assertThat(event.getHubId()).isEqualTo(command.hubId()));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
@@ -130,10 +119,29 @@ class HubRouteServiceTest {
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(routeWeightApi, never()).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteEventPublisher).publishRouteBuildCompleted(command);
+    }
+
+    @Test
+    @DisplayName("중복 HubCreatedEvent 수신 시 기존 PENDING 경로가 있으면 완료 이벤트를 발행하지 않는다")
+    void build_routes_for_center_whenPendingSkeletonExists_skipsBuildCompletedEvent() {
+        BuildRouteCommand command = new BuildRouteCommand(null, center1.getHubId(), center1.getName(), center1.getAddress(), HubType.CENTER);
+        when(hubRepository.findByIdIncludingCreating(center1.getHubId())).thenReturn(Optional.of(center1));
+        when(hubRepository.findAllByHubType(HubType.CENTER)).thenReturn(List.of(center1, center2));
+        when(hubRouteRepository.findByStartHubOrEndHub(center1, center1))
+                .thenReturn(List.of(
+                        HubRoute.skeleton(center1.getHubId(), center1, center2),
+                        HubRoute.skeleton(center1.getHubId(), center2, center1)
+                ));
+        when(hubRouteRepository.hasIncompleteRoutes(center1.getHubId())).thenReturn(true);
+
+        hubRouteService.buildRoutesForNewHub(command);
+
+        verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
@@ -150,7 +158,6 @@ class HubRouteServiceTest {
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(routeWeightApi, never()).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteEventPublisher).publishRouteBuildCompleted(command);
@@ -167,10 +174,10 @@ class HubRouteServiceTest {
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(routeWeightApi, never()).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(routes ->
                 routes.size() == 1 && containsRoute(routes, center2, center1)));
-        verify(hubRouteEventPublisher).publishRouteCreatedEvent(argThat(events -> events.size() == 1));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
@@ -184,10 +191,10 @@ class HubRouteServiceTest {
 
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(routeWeightApi, never()).getRouteInfo(any());
         verify(hubRouteRepository).insertIgnore(argThat(routes ->
                 routes.size() == 1 && containsRoute(routes, center1, branch)));
-        verify(hubRouteEventPublisher).publishRouteCreatedEvent(argThat(events -> events.size() == 1));
+        verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
@@ -200,6 +207,38 @@ class HubRouteServiceTest {
 
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteRepository, never()).insertIgnore(any(Set.class));
+    }
+
+    @Test
+    @DisplayName("스케줄러가 경로 가중치 저장을 완료하면 생성 이벤트와 전체 완료 이벤트를 발행한다.")
+    void complete_route_build_publishes_created_and_completed_events() {
+        UUID buildHubId = center1.getHubId();
+        HubRoute route = HubRoute.skeleton(buildHubId, center1, center2);
+        route.claimProcessing();
+        when(hubRouteRepository.findByIdWithHubs(route.getRouteId())).thenReturn(Optional.of(route));
+        when(hubRouteRepository.hasIncompleteRoutes(buildHubId)).thenReturn(false);
+        when(hubRepository.findByIdIncludingCreating(buildHubId)).thenReturn(Optional.of(center1));
+
+        hubRouteService.completeRouteBuild(route.getRouteId(), RouteWeight.of(BigDecimal.valueOf(11.9), 32));
+
+        assertThat(route.isComplete()).isTrue();
+        verify(hubRouteRepository).save(route);
+        verify(hubRouteEventPublisher).publishRouteCreatedEvent(argThat(events -> events.size() == 1));
+        verify(hubRouteEventPublisher).publishRouteBuildCompleted(any(BuildRouteCommand.class));
+    }
+
+    @Test
+    @DisplayName("경로 가중치 저장이 최종 실패하면 허브 생성 보상을 수행한다.")
+    void fail_route_build_compensates_hub_when_retry_exhausted() {
+        UUID buildHubId = center1.getHubId();
+        HubRoute route = HubRoute.skeleton(buildHubId, center1, center2);
+        route.claimProcessing();
+        when(hubRouteRepository.findByIdWithHubs(route.getRouteId())).thenReturn(Optional.of(route));
+
+        hubRouteService.failRouteBuild(route.getRouteId(), "map down", 1, Duration.ofSeconds(30));
+
+        verify(hubRouteRepository).save(route);
+        verify(hubCreationSagaService).compensate(buildHubId, "map down");
     }
 
     @Test
@@ -264,12 +303,4 @@ class HubRouteServiceTest {
                 .anyMatch(route -> route.getStartHub().equals(startHub) && route.getEndHub().equals(endHub));
     }
 
-    private RouteWeightResult routeWeightResult(double distanceKm, int durationMinutes) {
-        return new RouteWeightResult(
-                BigDecimal.valueOf(distanceKm),
-                durationMinutes,
-                MapProvider.UNKNOWN,
-                false
-        );
-    }
 }

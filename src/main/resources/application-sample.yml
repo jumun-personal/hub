@@ -99,6 +99,14 @@ hub:
     deleted-by: ${HUB_COMPENSATION_DELETED_BY:0}
   route:
     provider-unavailable-ttl: ${HUB_ROUTE_PROVIDER_UNAVAILABLE_TTL:30s}
+    build:
+      scheduler:
+        enabled: ${HUB_ROUTE_BUILD_SCHEDULER_ENABLED:true}
+      fixed-delay-ms: ${HUB_ROUTE_BUILD_FIXED_DELAY_MS:1000}
+      batch-size: ${HUB_ROUTE_BUILD_BATCH_SIZE:10}
+      stale-processing-timeout: ${HUB_ROUTE_BUILD_STALE_PROCESSING_TIMEOUT:5m}
+      retry-backoff: ${HUB_ROUTE_BUILD_RETRY_BACKOFF:30s}
+      max-retries: ${HUB_ROUTE_BUILD_MAX_RETRIES:3}
 
 eureka:
   client:
@@ -117,7 +125,17 @@ resilience4j:
     instances:
       kakaoRoute:
         registerHealthIndicator: true
-        slidingWindowSize: 10
+        slidingWindowType: TIME_BASED
+        slidingWindowSize: 30
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      naverRoute:
+        registerHealthIndicator: true
+        slidingWindowType: TIME_BASED
+        slidingWindowSize: 30
         minimumNumberOfCalls: 5
         failureRateThreshold: 50
         waitDurationInOpenState: 10s

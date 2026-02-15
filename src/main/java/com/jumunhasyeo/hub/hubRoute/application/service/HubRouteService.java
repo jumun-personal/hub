@@ -2,16 +2,15 @@ package com.jumunhasyeo.hub.hubRoute.application.service;
 
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
+import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
-import com.jumunhasyeo.hub.hubRoute.application.dto.ProviderHint;
+import com.jumunhasyeo.hub.hubRoute.application.command.RouteBuildTarget;
 import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
-import com.jumunhasyeo.hub.hubRoute.application.dto.request.RouteWeightQuery;
-import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
@@ -23,10 +22,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -36,10 +38,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class HubRouteService {
     private final HubRepository hubRepository;
-    private final RouteWeightApiService routeWeightApi;
     private final HubRouteRepository hubRouteRepository;
     private final HubRouteDomainService hubRouteDomainService;
     private final HubRouteEventPublisher hubRouteEventPublisher;
+    private final HubCreationSagaService hubCreationSagaService;
 
     /**
      * 새로운 Hub 생성 시 경로 자동 생성
@@ -54,13 +56,9 @@ public class HubRouteService {
             hubRoutes.addAll(buildForBranch(command));
         }
 
-        if (!hubRoutes.isEmpty()) {
-            List<HubRouteCreatedEvent> createEventList = hubRoutes.stream()
-                    .map(route -> HubRouteCreatedEvent.from(command.hubId(), route))
-                    .collect(Collectors.toList());
-            hubRouteEventPublisher.publishRouteCreatedEvent(createEventList);
+        if (hubRoutes.isEmpty() && !hubRouteRepository.hasIncompleteRoutes(command.hubId())) {
+            hubRouteEventPublisher.publishRouteBuildCompleted(command);
         }
-        hubRouteEventPublisher.publishRouteBuildCompleted(command);
     }
 
     /**
@@ -75,10 +73,10 @@ public class HubRouteService {
         Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(newCenterHub);
 
         // Domain Service에 Route 생성 로직 위임
-        Set<HubRoute> routes = hubRouteDomainService.buildRoutesForNewCenterHub(
-            newCenterHub, 
-            existingCenterHubs,
-            (from, to) -> resolveRouteWeight(from, to, existingRouteMap)
+        Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewCenterHub(
+            command.hubId(),
+            newCenterHub,
+            existingCenterHubs
         );
         Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
 
@@ -94,44 +92,15 @@ public class HubRouteService {
         Hub centerHub = getHub(command.centerHubId());
         Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(branchHub);
 
-        Set<HubRoute> routes = hubRouteDomainService.buildRoutesForNewBranchHub(
+        Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewBranchHub(
+            command.hubId(),
             branchHub,
-            centerHub,
-            (from, to) -> resolveRouteWeight(from, to, existingRouteMap)
+            centerHub
         );
         Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
 
         hubRouteRepository.insertIgnore(filteredRoutes);
         return filteredRoutes;
-    }
-
-    /**
-     * 경로 가중치(시간,거리) 계산
-     */
-    private RouteWeight calculateRouteWeight(Hub from, Hub to) {
-        RouteWeightQuery query = new RouteWeightQuery(
-                from.getHubId(),
-                from.getCoordinate(),
-                to.getCoordinate(),
-                resolvePurpose(from, to),
-                ProviderHint.ANY
-        );
-        RouteWeightResult response = routeWeightApi.getRouteInfo(query);
-        return RouteWeight.of(response.distanceKm(), response.durationMinutes());
-    }
-
-    private RouteWeight resolveRouteWeight(Hub from, Hub to, Map<RouteKey, HubRoute> existingRouteMap) {
-        HubRoute existing = existingRouteMap.get(routeKey(from, to));
-        if (existing != null) {
-            return existing.getRouteWeight();
-        }
-
-        HubRoute reverse = existingRouteMap.get(routeKey(to, from));
-        if (reverse != null) {
-            return reverse.getRouteWeight();
-        }
-
-        return calculateRouteWeight(from, to);
     }
 
     private Map<RouteKey, HubRoute> getExistingRouteMap(Hub hub) {
@@ -173,6 +142,74 @@ public class HubRouteService {
             return RoutePurpose.BRANCH_TO_CENTER;
         }
         return RoutePurpose.BRANCH_TO_BRANCH;
+    }
+
+    public List<UUID> claimRouteBuildTargets(int batchSize, Duration staleProcessingTimeout) {
+        LocalDateTime now = LocalDateTime.now();
+        return hubRouteRepository.claimPendingForBuild(
+                batchSize,
+                now,
+                now.minus(staleProcessingTimeout)
+        );
+    }
+
+    public Optional<RouteBuildTarget> getRouteBuildTarget(UUID routeId) {
+        return hubRouteRepository.findByIdWithHubs(routeId)
+                .filter(route -> !route.isComplete())
+                .map(route -> new RouteBuildTarget(
+                        route.getRouteId(),
+                        route.getBuildHubId(),
+                        route.getStartHub().getHubId(),
+                        route.getStartHub().getCoordinate(),
+                        route.getEndHub().getHubId(),
+                        route.getEndHub().getCoordinate(),
+                        resolvePurpose(route.getStartHub(), route.getEndHub())
+                ));
+    }
+
+    @Transactional
+    public void completeRouteBuild(UUID routeId, RouteWeight routeWeight) {
+        HubRoute route = hubRouteRepository.findByIdWithHubs(routeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_ROUTE_NOT_FOUND));
+        if (route.isComplete()) {
+            return;
+        }
+
+        route.complete(routeWeight);
+        hubRouteRepository.save(route);
+        hubRouteEventPublisher.publishRouteCreatedEvent(List.of(HubRouteCreatedEvent.from(route.getBuildHubId(), route)));
+
+        if (route.getBuildHubId() != null && !hubRouteRepository.hasIncompleteRoutes(route.getBuildHubId())) {
+            hubRouteEventPublisher.publishRouteBuildCompleted(buildCompletedCommand(route.getBuildHubId()));
+        }
+    }
+
+    @Transactional
+    public void failRouteBuild(UUID routeId, String reason, int maxRetries, Duration retryBackoff) {
+        HubRoute route = hubRouteRepository.findByIdWithHubs(routeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_ROUTE_NOT_FOUND));
+        if (route.isComplete()) {
+            return;
+        }
+
+        boolean finalFailed = route.failOrRetry(
+                reason,
+                maxRetries,
+                LocalDateTime.now().plus(retryBackoff)
+        );
+        hubRouteRepository.save(route);
+
+        if (finalFailed && route.getBuildHubId() != null) {
+            hubCreationSagaService.compensate(route.getBuildHubId(), reason);
+        }
+    }
+
+    private BuildRouteCommand buildCompletedCommand(UUID buildHubId) {
+        Hub hub = getHubIncludingCreating(buildHubId);
+        UUID centerHubId = hub.isBranchHub()
+                ? hub.getCenterHubs().stream().findFirst().map(Hub::getHubId).orElse(null)
+                : null;
+        return new BuildRouteCommand(centerHubId, hub.getHubId(), hub.getName(), hub.getAddress(), hub.getHubType());
     }
 
     /**

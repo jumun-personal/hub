@@ -24,6 +24,8 @@ public class QHubRoute extends EntityPathBase<HubRoute> {
 
     public final com.jumunhasyeo.common.QBaseEntity _super = new com.jumunhasyeo.common.QBaseEntity(this);
 
+    public final ComparablePath<java.util.UUID> buildHubId = createComparable("buildHubId", java.util.UUID.class);
+
     //inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
@@ -38,6 +40,8 @@ public class QHubRoute extends EntityPathBase<HubRoute> {
 
     public final com.jumunhasyeo.hub.hub.domain.entity.QHub endHub;
 
+    public final StringPath errorMessage = createString("errorMessage");
+
     //inherited
     public final BooleanPath isDeleted = _super.isDeleted;
 
@@ -47,11 +51,17 @@ public class QHubRoute extends EntityPathBase<HubRoute> {
     //inherited
     public final NumberPath<Long> modifiedBy = _super.modifiedBy;
 
+    public final DateTimePath<java.time.LocalDateTime> nextRetryAt = createDateTime("nextRetryAt", java.time.LocalDateTime.class);
+
+    public final NumberPath<Integer> retryCount = createNumber("retryCount", Integer.class);
+
     public final ComparablePath<java.util.UUID> routeId = createComparable("routeId", java.util.UUID.class);
 
     public final com.jumunhasyeo.hub.hubRoute.domain.vo.QRouteWeight routeWeight;
 
     public final com.jumunhasyeo.hub.hub.domain.entity.QHub startHub;
+
+    public final EnumPath<HubRouteStatus> status = createEnum("status", HubRouteStatus.class);
 
     public QHubRoute(String variable) {
         this(HubRoute.class, forVariable(variable), INITS);

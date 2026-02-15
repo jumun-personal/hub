@@ -57,6 +57,12 @@ import static org.mockito.Mockito.times;
         "resilience4j.circuitbreaker.instances.kakaoRoute.minimumNumberOfCalls=10",
         "resilience4j.circuitbreaker.instances.kakaoRoute.failureRateThreshold=50",
         "resilience4j.circuitbreaker.instances.kakaoRoute.waitDurationInOpenState=60s",
+        "resilience4j.circuitbreaker.instances.kakaoRoute.slidingWindowType=TIME_BASED",
+        "resilience4j.circuitbreaker.instances.naverRoute.slidingWindowSize=5",
+        "resilience4j.circuitbreaker.instances.naverRoute.minimumNumberOfCalls=10",
+        "resilience4j.circuitbreaker.instances.naverRoute.failureRateThreshold=50",
+        "resilience4j.circuitbreaker.instances.naverRoute.waitDurationInOpenState=60s",
+        "resilience4j.circuitbreaker.instances.naverRoute.slidingWindowType=TIME_BASED",
         "resilience4j.ratelimiter.instances.kakaoRoute.limitForPeriod=1000",
         "resilience4j.ratelimiter.instances.kakaoRoute.limitRefreshPeriod=1s",
         "resilience4j.ratelimiter.instances.kakaoRoute.timeoutDuration=0ms",
@@ -88,6 +94,7 @@ class ResilientRouteWeightApiServiceTest {
     void setUp() {
         reset(kakaoStrategy, naverStrategy, routeProviderAvailabilityService);
         circuitBreakerRegistry.circuitBreaker("kakaoRoute").reset();
+        circuitBreakerRegistry.circuitBreaker("naverRoute").reset();
     }
 
     @Test
@@ -111,7 +118,10 @@ class ResilientRouteWeightApiServiceTest {
                 .getMetrics()
                 .getNumberOfFailedCalls())
                 .isEqualTo(1);
-        assertThat(circuitBreakerRegistry.find("naverRoute")).isEmpty();
+        assertThat(circuitBreakerRegistry.circuitBreaker("naverRoute")
+                .getMetrics()
+                .getNumberOfFailedCalls())
+                .isEqualTo(0);
         then(routeProviderAvailabilityService).should().clearAllProvidersUnavailable();
         then(routeProviderAvailabilityService).should(never()).markAllProvidersUnavailable(any());
     }
@@ -155,6 +165,23 @@ class ResilientRouteWeightApiServiceTest {
     }
 
     @Test
+    @DisplayName("Naver circuit이 OPEN이면 Naver 실제 호출 없이 전체 흐름을 retry한 뒤 최종 예외가 전파된다")
+    void getRouteInfo_whenNaverCircuitOpen_retriesWithoutNaverCallThenThrowsException() {
+        // given
+        RouteWeightQuery query = routeWeightQuery();
+        circuitBreakerRegistry.circuitBreaker("kakaoRoute").transitionToOpenState();
+        circuitBreakerRegistry.circuitBreaker("naverRoute").transitionToOpenState();
+
+        // when & then
+        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+                .isInstanceOf(RuntimeException.class);
+        then(kakaoStrategy).should(never()).getWeight(any());
+        then(naverStrategy).should(never()).getWeight(any());
+        then(routeProviderAvailabilityService).should().markAllProvidersUnavailable(any());
+        then(routeProviderAvailabilityService).should(never()).clearAllProvidersUnavailable();
+    }
+
+    @Test
     @DisplayName("Naver fallback 실패 시 Kakao부터 시작하는 전체 경로 조회를 retry한다")
     void getRouteInfo_whenKakaoAndFallbackFail_retriesFromKakao() {
         // given
@@ -185,6 +212,22 @@ class ResilientRouteWeightApiServiceTest {
         // then
         assertThat(kakaoLimitForPeriod).isEqualTo(1000);
         assertThat(naverLimitForPeriod).isEqualTo(1000);
+    }
+
+    @Test
+    @DisplayName("Kakao와 Naver circuit은 독립적인 시간 기반 window로 동작한다")
+    void routeProviders_useIndependentTimeBasedCircuitBreakers() {
+        // when & then
+        assertThat(circuitBreakerRegistry.circuitBreaker("kakaoRoute")
+                .getCircuitBreakerConfig()
+                .getSlidingWindowType()
+                .name())
+                .isEqualTo("TIME_BASED");
+        assertThat(circuitBreakerRegistry.circuitBreaker("naverRoute")
+                .getCircuitBreakerConfig()
+                .getSlidingWindowType()
+                .name())
+                .isEqualTo("TIME_BASED");
     }
 
     private static RouteWeightQuery routeWeightQuery() {

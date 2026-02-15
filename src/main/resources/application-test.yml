@@ -114,6 +114,14 @@ hub:
     deleted-by: 0
   route:
     provider-unavailable-ttl: 30s
+    build:
+      scheduler:
+        enabled: false
+      fixed-delay-ms: 1000
+      batch-size: 10
+      stale-processing-timeout: 5m
+      retry-backoff: 30s
+      max-retries: 3
 
 # Resilience4j 비활성화
 resilience4j:
@@ -121,9 +129,12 @@ resilience4j:
     instances:
       kakaoRoute:
         baseConfig: default
+      naverRoute:
+        baseConfig: default
     configs:
       default:
         registerHealthIndicator: false
+        slidingWindowType: TIME_BASED
         slidingWindowSize: 10
         minimumNumberOfCalls: 10
         failureRateThreshold: 100  # 항상 닫힌 상태 유지

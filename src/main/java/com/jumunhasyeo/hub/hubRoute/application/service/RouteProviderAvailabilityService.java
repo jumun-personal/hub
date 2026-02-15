@@ -57,6 +57,15 @@ public class RouteProviderAvailabilityService {
         }
     }
 
+    public boolean isAllProvidersUnavailable() {
+        try {
+            return Boolean.TRUE.equals(stringRedisTemplate.hasKey(PROVIDERS_UNAVAILABLE_KEY));
+        } catch (RuntimeException e) {
+            log.warn("Failed to read route provider availability from Redis. fail-open.", e);
+            return false;
+        }
+    }
+
     private Duration providerUnavailableTtl() {
         return DurationStyle.detectAndParse(providerUnavailableTtl);
     }

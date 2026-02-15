@@ -69,10 +69,15 @@ public class ResilientRouteWeightApiService implements RouteWeightApiService {
     }
 
     private RouteWeightResult fallbackToNaver(RouteWeightQuery query) {
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(NAVER_ROUTE);
         RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(NAVER_ROUTE);
+        Supplier<RouteWeightResult> protectedNaverCall = CircuitBreaker.decorateSupplier(
+                circuitBreaker,
+                () -> naverStrategy.getWeight(query)
+        );
         Supplier<RouteWeightResult> naverCall = RateLimiter.decorateSupplier(
                 rateLimiter,
-                () -> naverStrategy.getWeight(query)
+                protectedNaverCall
         );
         RouteWeightResult result = naverCall.get();
         return new RouteWeightResult(

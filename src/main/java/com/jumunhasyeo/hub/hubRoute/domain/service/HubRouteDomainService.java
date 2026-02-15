@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -67,6 +68,46 @@ public class HubRouteDomainService {
         return merge(branchToCenter, branchToBranch);
     }
 
+    /**
+     * 센터 허브 생성 시 API 호출 전 skeleton 경로만 생성한다.
+     */
+    public Set<HubRoute> buildRouteSkeletonsForNewCenterHub(
+            UUID buildHubId,
+            Hub newCenterHub,
+            List<Hub> existingCenterHubs) {
+
+        validateCenterHub(newCenterHub);
+
+        return existingCenterHubs.stream()
+                .filter(existingCenter -> !existingCenter.equals(newCenterHub))
+                .peek(existingCenter -> validateRouteCreation(newCenterHub, existingCenter))
+                .flatMap(existingCenter -> createTwoWayRouteSkeletons(buildHubId, existingCenter, newCenterHub).stream())
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 지점 허브 생성 시 API 호출 전 skeleton 경로만 생성한다.
+     */
+    public Set<HubRoute> buildRouteSkeletonsForNewBranchHub(
+            UUID buildHubId,
+            Hub branchHub,
+            Hub centerHub) {
+
+        validateBranchHub(branchHub);
+        validateCenterHub(centerHub);
+        validateBranchExistToCenter(branchHub, centerHub);
+        validateRouteCreation(branchHub, centerHub);
+
+        HashSet<HubRoute> branchToCenter = createTwoWayRouteSkeletons(buildHubId, branchHub, centerHub);
+        HashSet<HubRoute> branchToBranch = centerHub.getBranchHubs()
+                .stream()
+                .filter(relBranchHub -> !relBranchHub.equals(branchHub))
+                .flatMap(filtered -> createTwoWayRouteSkeletons(buildHubId, branchHub, filtered).stream())
+                .collect(Collectors.toCollection(HashSet::new));
+
+        return merge(branchToCenter, branchToBranch);
+    }
+
     private Set<HubRoute> merge(HashSet<HubRoute> branchToCenter, HashSet<HubRoute> branchToBranch) {
         HashSet<HubRoute> merged = new HashSet<>();
         merged.addAll(branchToCenter);
@@ -77,6 +118,10 @@ public class HubRouteDomainService {
     private HashSet<HubRoute> createTwoWayRoutes(Hub branchHub, Hub centerHub, RouteWeightCalculator calculator) {
         RouteWeight weight = calculator.calculate(branchHub, centerHub);
         return HubRoute.createTwoWay(branchHub, centerHub, weight);
+    }
+
+    private HashSet<HubRoute> createTwoWayRouteSkeletons(UUID buildHubId, Hub from, Hub to) {
+        return HubRoute.createTwoWaySkeleton(buildHubId, from, to);
     }
 
     /**

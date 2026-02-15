@@ -12,10 +12,10 @@ import java.math.BigDecimal;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode
 public class RouteWeight {
-    @Column(name = "distance_km", nullable = false, precision = 10, scale = 2)
+    @Column(name = "distance_km", precision = 10, scale = 2)
     private BigDecimal distanceKm;  // 거리 (km)
 
-    @Column(name = "duration_minutes", nullable = false)
+    @Column(name = "duration_minutes")
     private Integer durationMinutes;  // 예상 소요 시간 (분)
 
     public static RouteWeight of(BigDecimal distanceKm , Integer durationMinutes) {
