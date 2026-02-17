@@ -90,7 +90,10 @@ public class RedisConfig {
 
     @Bean
     @Primary
-    public RedisCacheManager cacheManager(RedisConnectionFactory factory) {
+    public RedisCacheManager cacheManager(
+            RedisConnectionFactory factory,
+            @Value("${hub.cache.ttl:30m}") Duration hubCacheTtl
+    ) {
         RedisCacheConfiguration cacheConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer())
@@ -98,6 +101,7 @@ public class RedisConfig {
 
         // 캐시별로 다른 TTL TODO 나중에 설정 파일로 분리
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+        cacheConfigs.put("hub", cacheConfig.entryTtl(hubCacheTtl)); // 허브 단건/전체 조회
         cacheConfigs.put("product", cacheConfig.entryTtl(Duration.ofMinutes(30))); // 상품 단건 조회 30분
 
         return RedisCacheManager.builder(factory)

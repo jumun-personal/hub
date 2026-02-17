@@ -110,6 +110,12 @@ naver:
     api-key: dummy-naver-api-key-for-test
 
 hub:
+  cache:
+    ttl: 30m
+    lock-ttl: 3s
+    wait-interval: 50ms
+    max-wait-attempts: 10
+    db-fallback-bulkhead-size: 20
   compensation:
     deleted-by: 0
   route:

@@ -42,7 +42,7 @@ public class DynamicHubServiceProxy implements HubService {
             String className = service.getClass().getSimpleName();
             if (className.contains("Redis")) {
                 implementations.put("REDIS", service);
-            } else if (className.equals("HubServiceImpl")) {
+            } else if (className.contains("HubServiceImpl")) {
                 implementations.put("NONE", service);
             }
         }

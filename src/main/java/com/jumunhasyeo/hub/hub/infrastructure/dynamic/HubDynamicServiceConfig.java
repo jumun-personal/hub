@@ -1,6 +1,7 @@
 package com.jumunhasyeo.hub.hub.infrastructure.dynamic;
 
 import com.jumunhasyeo.hub.hub.application.HubEventPublisher;
+import com.jumunhasyeo.hub.hub.application.HubCacheProperties;
 import com.jumunhasyeo.hub.hub.application.HubRedisCachedDecoratorService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -10,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Slf4j
 @Configuration
@@ -33,8 +36,18 @@ public class HubDynamicServiceConfig {
     }
 
     @Bean
-    public HubRedisCachedDecoratorService hubRedisCached(HubServiceImpl hubServiceImpl) {
+    public HubRedisCachedDecoratorService hubRedisCached(
+            HubServiceImpl hubServiceImpl,
+            RedisTemplate<String, Object> redisTemplate,
+            StringRedisTemplate stringRedisTemplate,
+            HubCacheProperties hubCacheProperties
+    ) {
         log.info("[Dynamic] Creating HubRedisCachedDecoratorService");
-        return new HubRedisCachedDecoratorService(hubServiceImpl);
+        return new HubRedisCachedDecoratorService(
+                hubServiceImpl,
+                redisTemplate,
+                stringRedisTemplate,
+                hubCacheProperties
+        );
     }
 }

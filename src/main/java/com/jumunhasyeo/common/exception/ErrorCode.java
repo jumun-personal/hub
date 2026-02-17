@@ -38,6 +38,7 @@ public enum ErrorCode {
     HUB_MUST_BE_CENTER_TYPE(HttpStatus.BAD_REQUEST, "EH004", "센터 타입 허브여야 합니다."),
     HUB_MUST_BE_BRANCH_TYPE(HttpStatus.BAD_REQUEST, "EH005", "지점 타입 허브여야 합니다."),
     CANNOT_DELETE_CENTER_HUB_WITH_BRANCHES(HttpStatus.BAD_REQUEST, "EH006", "지점 허브가 존재하는 센터 허브는 삭제할 수 없습니다."),
+    HUB_CACHE_FALLBACK_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "EH007", "허브 조회가 일시적으로 제한됩니다."),
 
     //HubRelation
     HUB_RELATION_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "EHR001", "허브 관계가 이미 존재합니다."),

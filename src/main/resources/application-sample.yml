@@ -95,6 +95,12 @@ naver:
     api-key: ${NAVER_MAPS_API_KEY}
 
 hub:
+  cache:
+    ttl: ${HUB_CACHE_TTL:30m}
+    lock-ttl: ${HUB_CACHE_LOCK_TTL:3s}
+    wait-interval: ${HUB_CACHE_WAIT_INTERVAL:50ms}
+    max-wait-attempts: ${HUB_CACHE_MAX_WAIT_ATTEMPTS:10}
+    db-fallback-bulkhead-size: ${HUB_CACHE_DB_FALLBACK_BULKHEAD_SIZE:20}
   compensation:
     deleted-by: ${HUB_COMPENSATION_DELETED_BY:0}
   route:

@@ -1,6 +1,7 @@
 package com.jumunhasyeo.common.config;
 
 import com.jumunhasyeo.hub.hub.application.HubEventPublisher;
+import com.jumunhasyeo.hub.hub.application.HubCacheProperties;
 import com.jumunhasyeo.hub.hub.application.HubRedisCachedDecoratorService;
 import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
@@ -12,6 +13,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * HubService 빈 설정
@@ -27,7 +30,10 @@ public class HubServiceConfig {
             HubRepository hubRepository,
             HubRepositoryCustom hubRepositoryCustom,
             HubEventPublisher hubEventPublisher,
-            RouteProviderAvailabilityService routeProviderAvailabilityService
+            RouteProviderAvailabilityService routeProviderAvailabilityService,
+            RedisTemplate<String, Object> redisTemplate,
+            StringRedisTemplate stringRedisTemplate,
+            HubCacheProperties hubCacheProperties
     ) {
         log.info("[FixedCache] Creating HubService with Redis");
         HubServiceImpl impl = new HubServiceImpl(
@@ -36,7 +42,12 @@ public class HubServiceConfig {
                 hubEventPublisher,
                 routeProviderAvailabilityService
         );
-        return new HubRedisCachedDecoratorService(impl);
+        return new HubRedisCachedDecoratorService(
+                impl,
+                redisTemplate,
+                stringRedisTemplate,
+                hubCacheProperties
+        );
     }
 
     @Bean
@@ -62,7 +73,10 @@ public class HubServiceConfig {
             HubRepository hubRepository,
             HubRepositoryCustom hubRepositoryCustom,
             HubEventPublisher hubEventPublisher,
-            RouteProviderAvailabilityService routeProviderAvailabilityService
+            RouteProviderAvailabilityService routeProviderAvailabilityService,
+            RedisTemplate<String, Object> redisTemplate,
+            StringRedisTemplate stringRedisTemplate,
+            HubCacheProperties hubCacheProperties
     ) {
         log.warn("[FixedCache] Fallback - Creating HubService with Redis");
         HubServiceImpl impl = new HubServiceImpl(
@@ -71,6 +85,11 @@ public class HubServiceConfig {
                 hubEventPublisher,
                 routeProviderAvailabilityService
         );
-        return new HubRedisCachedDecoratorService(impl);
+        return new HubRedisCachedDecoratorService(
+                impl,
+                redisTemplate,
+                stringRedisTemplate,
+                hubCacheProperties
+        );
     }
 }
