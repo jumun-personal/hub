@@ -19,6 +19,7 @@ import java.util.UUID;
         ),
         indexes = {
                 @Index(name = "idx_hub_route_build_status_retry", columnList = "build_hub_id, route_status, next_retry_at"),
+                @Index(name = "idx_hub_route_refresh_due", columnList = "route_status, next_refresh_at, refresh_claimed_at"),
                 @Index(name = "idx_hub_route_status_modified_at", columnList = "route_status, modified_at")
         }
 )
@@ -52,6 +53,13 @@ public class HubRoute extends BaseEntity {
     @Embedded
     private RouteWeight routeWeight;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolved_provider")
+    private RouteProvider resolvedProvider;
+
+    @Column(name = "resolved_by_fallback")
+    private Boolean resolvedByFallback;
+
     @Column(name = "retry_count", nullable = false)
     @Builder.Default
     private Integer retryCount = 0;
@@ -61,6 +69,12 @@ public class HubRoute extends BaseEntity {
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
+
+    @Column(name = "next_refresh_at")
+    private LocalDateTime nextRefreshAt;
+
+    @Column(name = "refresh_claimed_at")
+    private LocalDateTime refreshClaimedAt;
 
     public static HubRoute of(Hub startHub, Hub endHub, RouteWeight weight) {
         return HubRoute.builder()
@@ -112,11 +126,70 @@ public class HubRoute extends BaseEntity {
         this.errorMessage = null;
     }
 
+    public void scheduleRecovery(LocalDateTime recoveryAt) {
+        this.nextRetryAt = recoveryAt;
+    }
+
+    public void defer(LocalDateTime nextAttemptAt, String reason) {
+        this.status = HubRouteStatus.PENDING;
+        this.nextRetryAt = nextAttemptAt;
+        this.errorMessage = reason;
+    }
+
     public void complete(RouteWeight routeWeight) {
+        complete(routeWeight, RouteProvider.UNKNOWN, false);
+    }
+
+    public void complete(RouteWeight routeWeight, RouteProvider provider, boolean fallback) {
         this.routeWeight = routeWeight;
+        this.resolvedProvider = provider;
+        this.resolvedByFallback = fallback;
         this.status = HubRouteStatus.COMPLETE;
         this.nextRetryAt = null;
         this.errorMessage = null;
+    }
+
+    public void complete(RouteWeight routeWeight, LocalDateTime nextRefreshAt) {
+        complete(routeWeight, RouteProvider.UNKNOWN, false, nextRefreshAt);
+    }
+
+    public void complete(
+            RouteWeight routeWeight,
+            RouteProvider provider,
+            boolean fallback,
+            LocalDateTime nextRefreshAt
+    ) {
+        complete(routeWeight, provider, fallback);
+        this.nextRefreshAt = nextRefreshAt;
+        this.refreshClaimedAt = null;
+    }
+
+    public void claimRefresh(LocalDateTime claimedAt) {
+        this.refreshClaimedAt = claimedAt;
+    }
+
+    public void completeRefresh(RouteWeight routeWeight, LocalDateTime nextRefreshAt) {
+        completeRefresh(routeWeight, RouteProvider.UNKNOWN, false, nextRefreshAt);
+    }
+
+    public void completeRefresh(
+            RouteWeight routeWeight,
+            RouteProvider provider,
+            boolean fallback,
+            LocalDateTime nextRefreshAt
+    ) {
+        this.routeWeight = routeWeight;
+        this.resolvedProvider = provider;
+        this.resolvedByFallback = fallback;
+        this.nextRefreshAt = nextRefreshAt;
+        this.refreshClaimedAt = null;
+        this.errorMessage = null;
+    }
+
+    public void deferRefresh(LocalDateTime nextAttemptAt, String reason) {
+        this.nextRefreshAt = nextAttemptAt;
+        this.refreshClaimedAt = null;
+        this.errorMessage = reason;
     }
 
     public boolean failOrRetry(String errorMessage, int maxRetries, LocalDateTime nextRetryAt) {
@@ -130,6 +203,13 @@ public class HubRoute extends BaseEntity {
         this.status = HubRouteStatus.PENDING;
         this.nextRetryAt = nextRetryAt;
         return false;
+    }
+
+    public void failPermanently(String errorMessage) {
+        this.retryCount = this.retryCount + 1;
+        this.errorMessage = errorMessage;
+        this.status = HubRouteStatus.FAILED;
+        this.nextRetryAt = null;
     }
 
     public boolean isComplete() {

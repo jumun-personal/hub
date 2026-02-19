@@ -73,7 +73,8 @@ class KafkaConfigTest {
         var hubRouteFactory = kafkaConfig.hubRouteKafkaListenerContainerFactory(
                 consumerFactory,
                 hubRouteDlqRecoverer,
-                kafkaTransactionManager
+                kafkaTransactionManager,
+                3
         );
 
         assertThat(commonFactory.getContainerProperties().getAckMode())
@@ -129,7 +130,7 @@ class KafkaConfigTest {
                 .containsEntry("acks", "all")
                 .containsEntry("max.in.flight.requests.per.connection", 5);
         assertThat(producerFactory.getTransactionIdPrefix())
-                .isEqualTo("hub-route-tx-");
+                .startsWith("hub-route-tx-");
     }
 
     @Test

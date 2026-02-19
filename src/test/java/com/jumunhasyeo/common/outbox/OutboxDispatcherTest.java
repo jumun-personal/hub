@@ -3,7 +3,6 @@ package com.jumunhasyeo.hub.infrastructure.outbox;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,7 +13,6 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -38,15 +36,10 @@ class OutboxDispatcherTest {
     @InjectMocks
     private OutboxDispatcher outboxDispatcher;
 
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(outboxDispatcher, "hubTopic", "hub-topic");
-    }
-
     @Test
-    @DisplayName("알 수 없는 토픽이면 INVALID_INPUT 예외가 발생한다.")
-    void dispatch_whenUnknownTopic_throwsBusinessException() {
-        OutboxEvent event = OutboxEvent.of("HubCreatedEvent", "{}", "event-key", "unknown-topic");
+    @DisplayName("토픽이 비어 있으면 INVALID_INPUT 예외가 발생한다.")
+    void dispatch_whenTopicIsBlank_throwsBusinessException() {
+        OutboxEvent event = OutboxEvent.of("HubCreatedEvent", "{}", "event-key", " ");
 
         assertThatThrownBy(() -> outboxDispatcher.dispatch(event))
                 .isInstanceOf(BusinessException.class)

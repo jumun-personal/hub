@@ -1,6 +1,5 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
-import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -49,9 +48,6 @@ class HubRouteServiceTest {
     private HubRouteRepository hubRouteRepository;
     @Mock
     private HubRouteEventPublisher hubRouteEventPublisher;
-    @Mock
-    private HubCreationSagaService hubCreationSagaService;
-
     private HubRouteService hubRouteService;
     private HubRouteDomainService hubRouteDomainService;
 
@@ -66,13 +62,16 @@ class HubRouteServiceTest {
                 hubRepository,
                 hubRouteRepository,
                 hubRouteDomainService,
-                hubRouteEventPublisher,
-                hubCreationSagaService
+                hubRouteEventPublisher
         );
         center1 = hub(UUID.randomUUID(), "센터1", HubType.CENTER, 37.5, 127.0);
         center2 = hub(UUID.randomUUID(), "센터2", HubType.CENTER, 35.8, 128.6);
         branch = hub(UUID.randomUUID(), "지점1", HubType.BRANCH, 37.4, 127.1);
         branch.addCenterHub(center1);
+        org.mockito.Mockito.lenient().when(hubRouteRepository.insertIgnore(any(Set.class))).thenAnswer(invocation -> {
+            Set<HubRoute> routes = invocation.getArgument(0);
+            return routes.stream().map(HubRoute::getRouteId).collect(java.util.stream.Collectors.toSet());
+        });
     }
 
     @Test
@@ -86,6 +85,9 @@ class HubRouteServiceTest {
         hubRouteService.buildRoutesForNewHub(command);
 
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
+        verify(hubRouteEventPublisher).publishRouteBuildRequested(argThat(events ->
+                events.size() == 1 && events.get(0).getRouteIds().size() == 2
+        ));
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
@@ -238,7 +240,7 @@ class HubRouteServiceTest {
         hubRouteService.failRouteBuild(route.getRouteId(), "map down", 1, Duration.ofSeconds(30));
 
         verify(hubRouteRepository).save(route);
-        verify(hubCreationSagaService).compensate(buildHubId, "map down");
+        verify(hubRouteEventPublisher).publishRouteBuildFailed(buildHubId, "map down");
     }
 
     @Test

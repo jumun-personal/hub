@@ -1,0 +1,21 @@
+spring:
+  config:
+    activate:
+      on-profile: route-worker
+  application:
+    name: hub-route-worker
+  main:
+    web-application-type: none
+
+hub:
+  api:
+    events:
+      enabled: false
+  route:
+    worker:
+      enabled: true
+    refresh:
+      enabled: true
+    build:
+      scheduler:
+        enabled: true

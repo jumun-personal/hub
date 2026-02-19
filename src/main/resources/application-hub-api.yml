@@ -1,0 +1,19 @@
+spring:
+  config:
+    activate:
+      on-profile: hub-api
+  application:
+    name: hub-product-stock-company-api
+
+hub:
+  api:
+    events:
+      enabled: true
+  route:
+    worker:
+      enabled: false
+    refresh:
+      enabled: false
+    build:
+      scheduler:
+        enabled: false

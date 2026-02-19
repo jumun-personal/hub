@@ -1,10 +1,9 @@
 package com.jumunhasyeo.common.scheduler;
 
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
-import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.convert.DurationStyle;
@@ -15,39 +14,40 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "hub.route.build.scheduler.enabled", havingValue = "true", matchIfMissing = true)
-public class HubRouteBuildScheduler {
+@ConditionalOnProperty(name = "hub.route.refresh.enabled", havingValue = "true", matchIfMissing = true)
+public class HubRouteRefreshScheduler {
 
     private final HubRouteService hubRouteService;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
     private final RoutePairBuildProcessor routePairBuildProcessor;
 
-    @Value("${hub.route.build.batch-size:10}")
+    @Value("${hub.route.refresh.batch-size:10}")
     private int batchSize;
 
-    @Value("${hub.route.build.stale-processing-timeout:PT5M}")
-    private String staleProcessingTimeout;
+    @Value("${hub.route.refresh.stale-timeout:5m}")
+    private String staleTimeout;
 
-    @Scheduled(fixedDelayString = "${hub.route.build.fixed-delay-ms:1000}")
-    public void buildPendingRoutes() {
+    @Scheduled(fixedDelayString = "${hub.route.refresh.poll-delay-ms:1000}")
+    public void refreshDueRoutes() {
         if (routeProviderAvailabilityService.isAllProvidersUnavailable()) {
-            log.info("Skip hub route build. route providers are unavailable.");
+            return;
+        }
+        if (hubRouteService.hasActiveBuildWork()) {
             return;
         }
 
-        List<UUID> routeIds = hubRouteService.findRouteBuildRecoveryTargets(batchSize, staleProcessingTimeout());
-        for (UUID routeId : routeIds) {
-            List<UUID> routePairIds = hubRouteService.findRoutePairIds(routeId);
+        List<UUID> candidates = hubRouteService.findRouteRefreshTargets(batchSize, staleTimeout());
+        for (UUID candidate : candidates) {
+            List<UUID> routePairIds = hubRouteService.findRoutePairIds(candidate);
             if (!routePairIds.isEmpty()) {
-                routePairBuildProcessor.process(routePairIds);
+                routePairBuildProcessor.processRefresh(routePairIds);
             }
         }
     }
 
-    private Duration staleProcessingTimeout() {
-        return DurationStyle.detectAndParse(staleProcessingTimeout);
+    private Duration staleTimeout() {
+        return DurationStyle.detectAndParse(staleTimeout);
     }
 }

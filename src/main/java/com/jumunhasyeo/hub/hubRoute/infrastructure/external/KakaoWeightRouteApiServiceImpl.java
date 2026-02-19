@@ -6,9 +6,14 @@ import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
 import com.jumunhasyeo.hub.hubRoute.application.dto.request.RouteWeightQuery;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderConfigurationException;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderTransientException;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteRequestRejectedException;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightStrategy;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteRateLimitExceededException;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.external.client.map.KakaoMobilityClient;
 import com.jumunhasyeo.hub.hubRoute.infrastructure.response.KakaoRouteResponse;
+import feign.RetryableException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -64,10 +69,16 @@ public class KakaoWeightRouteApiServiceImpl implements RouteWeightStrategy {
             Integer durationMinutes = response.getDurationMinutes();
             return new RouteWeightResult(distanceKm, durationMinutes, MapProvider.KAKAO, false);
 
+        } catch (RouteRateLimitExceededException
+                 | RouteRequestRejectedException
+                 | RouteProviderConfigurationException
+                 | RouteProviderTransientException e) {
+            throw e;
+        } catch (RetryableException e) {
+            throw new RouteProviderTransientException(MapProvider.KAKAO, "Kakao route API connection failed", e);
         } catch (Exception e) {
-            e.printStackTrace();
             log.error("Failed to get route from Kakao API, {}", e.toString());
-            throw new BusinessException(ErrorCode.MAP_API_EXCEPTION);
+            throw new RouteProviderTransientException(MapProvider.KAKAO, "Kakao route response handling failed", e);
         }
     }
 

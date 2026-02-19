@@ -1,6 +1,5 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
-import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -43,9 +42,6 @@ class HubRouteServicePerformanceTest {
     @Mock
     private HubRouteEventPublisher hubRouteEventPublisher;
 
-    @Mock
-    private HubCreationSagaService hubCreationSagaService;
-
     @Test
     @DisplayName("센터에 기존 지점 100개가 있을 때 새 지점 경로 skeleton 생성 서비스 속도를 측정한다.")
     void build_routes_for_new_branch_with_100_existing_branches_service() {
@@ -53,8 +49,7 @@ class HubRouteServicePerformanceTest {
                 hubRepository,
                 hubRouteRepository,
                 new HubRouteDomainService(),
-                hubRouteEventPublisher,
-                hubCreationSagaService
+                hubRouteEventPublisher
         );
         Hub centerHub = hub("센터", HubType.CENTER, 37.5, 127.0);
         for (int i = 0; i < EXISTING_BRANCH_COUNT; i++) {
@@ -74,6 +69,11 @@ class HubRouteServicePerformanceTest {
         given(hubRepository.findByIdIncludingCreating(newBranch.getHubId())).willReturn(Optional.of(newBranch));
         given(hubRepository.findById(centerHub.getHubId())).willReturn(Optional.of(centerHub));
         given(hubRouteRepository.findByStartHubOrEndHub(newBranch, newBranch)).willReturn(java.util.List.of());
+        given(hubRouteRepository.insertIgnore(org.mockito.ArgumentMatchers.any(Set.class)))
+                .willAnswer(invocation -> {
+                    Set<HubRoute> routes = invocation.getArgument(0);
+                    return routes.stream().map(HubRoute::getRouteId).collect(java.util.stream.Collectors.toSet());
+                });
 
         long started = System.nanoTime();
         service.buildRoutesForNewHub(command);

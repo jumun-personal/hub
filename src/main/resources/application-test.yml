@@ -10,6 +10,17 @@ spring:
     banner-mode: off
     log-startup-info: false
 
+  cloud:
+    openfeign:
+      client:
+        config:
+          kakao-mobility-client:
+            connectTimeout: 1000
+            readTimeout: 3000
+          naver-map-client:
+            connectTimeout: 1000
+            readTimeout: 3000
+
   task:
     scheduling:
       enabled: false
@@ -65,6 +76,7 @@ spring:
       auto-startup: false
     topics:
       hub: hub-test
+      hub-route-build: hub-route-build-test
       order: order-test
     producer:
       retries: 0
@@ -119,14 +131,34 @@ hub:
   compensation:
     deleted-by: 0
   route:
+    worker:
+      concurrency: 1
     provider-unavailable-ttl: 30s
+    rate-limit:
+      kakao:
+        permits-per-second: 100000
+      naver:
+        permits-per-second: 100000
+      retry-delay: 1s
+      retry-jitter-max: 0ms
+    refresh:
+      enabled: false
+      interval: 5m
+      poll-delay-ms: 1000
+      batch-size: 10
+      stale-timeout: 5m
+      non-retryable-delay: 30m
+      fallback-reconcile-delay: 1m
     build:
       scheduler:
         enabled: false
       fixed-delay-ms: 1000
       batch-size: 10
       stale-processing-timeout: 5m
-      retry-backoff: 30s
+      primary-retry-delay: 5s
+      retry-backoff: 10s
+      retry-backoff-max: 2m
+      retry-jitter-max: 0ms
       max-retries: 3
 
 # Resilience4j 비활성화
@@ -144,13 +176,12 @@ resilience4j:
         slidingWindowSize: 10
         minimumNumberOfCalls: 10
         failureRateThreshold: 100  # 항상 닫힌 상태 유지
-  retry:
-    instances:
-      routeResolve:
-        baseConfig: default
-    configs:
-      default:
-        maxAttempts: 1  # 재시도 비활성화
+        recordExceptions:
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderTransientException
+        ignoreExceptions:
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteRateLimitExceededException
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteRequestRejectedException
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderConfigurationException
   ratelimiter:
     instances:
       kakaoRoute:
