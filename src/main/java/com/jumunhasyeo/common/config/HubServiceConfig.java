@@ -7,7 +7,7 @@ import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
-import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,7 +30,7 @@ public class HubServiceConfig {
             HubRepository hubRepository,
             HubRepositoryCustom hubRepositoryCustom,
             HubEventPublisher hubEventPublisher,
-            RouteProviderAvailabilityService routeProviderAvailabilityService,
+            HubRouteService hubRouteService,
             RedisTemplate<String, Object> redisTemplate,
             StringRedisTemplate stringRedisTemplate,
             HubCacheProperties hubCacheProperties
@@ -40,7 +40,7 @@ public class HubServiceConfig {
                 hubRepository,
                 hubRepositoryCustom,
                 hubEventPublisher,
-                routeProviderAvailabilityService
+                hubRouteService
         );
         return new HubRedisCachedDecoratorService(
                 impl,
@@ -56,14 +56,14 @@ public class HubServiceConfig {
             HubRepository hubRepository,
             HubRepositoryCustom hubRepositoryCustom,
             HubEventPublisher hubEventPublisher,
-            RouteProviderAvailabilityService routeProviderAvailabilityService
+            HubRouteService hubRouteService
     ) {
         log.info("[FixedCache] Creating HubService without cache");
         return new HubServiceImpl(
                 hubRepository,
                 hubRepositoryCustom,
                 hubEventPublisher,
-                routeProviderAvailabilityService
+                hubRouteService
         );
     }
 
@@ -73,7 +73,7 @@ public class HubServiceConfig {
             HubRepository hubRepository,
             HubRepositoryCustom hubRepositoryCustom,
             HubEventPublisher hubEventPublisher,
-            RouteProviderAvailabilityService routeProviderAvailabilityService,
+            HubRouteService hubRouteService,
             RedisTemplate<String, Object> redisTemplate,
             StringRedisTemplate stringRedisTemplate,
             HubCacheProperties hubCacheProperties
@@ -83,7 +83,7 @@ public class HubServiceConfig {
                 hubRepository,
                 hubRepositoryCustom,
                 hubEventPublisher,
-                routeProviderAvailabilityService
+                hubRouteService
         );
         return new HubRedisCachedDecoratorService(
                 impl,

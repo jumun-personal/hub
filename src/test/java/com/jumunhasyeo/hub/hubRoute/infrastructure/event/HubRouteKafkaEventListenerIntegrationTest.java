@@ -35,8 +35,8 @@ public class HubRouteKafkaEventListenerIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("HubCreatedEvent를 수신하고 처리할 수 있다.")
-    void dispatch_HubCreatedEvent_integration_success() throws Exception {
+    @DisplayName("HubCreatedEvent는 경로 worker에서 무시한다.")
+    void dispatch_HubCreatedEvent_integration_ignored() throws Exception {
         //given
         Hub hub = createHub();
         HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
@@ -47,7 +47,7 @@ public class HubRouteKafkaEventListenerIntegrationTest extends IntegrationTest {
         hubRouteKafkaEventListener.dispatch(payload, simpleClassName);
 
         //then
-        then(hubRouteEventHandler).should(times(1)).hubCreated(any(HubCreatedEvent.class));
+        then(hubRouteEventHandler).shouldHaveNoInteractions();
     }
 
     @Test
@@ -71,7 +71,6 @@ public class HubRouteKafkaEventListenerIntegrationTest extends IntegrationTest {
     void listen_WhenEventTypeNull_skip() throws Exception {
         hubRouteKafkaEventListener.listen("{}", null);
 
-        then(hubRouteEventHandler).should(never()).hubCreated(any());
         then(hubRouteEventHandler).should(never()).hubDeleted(any());
     }
 

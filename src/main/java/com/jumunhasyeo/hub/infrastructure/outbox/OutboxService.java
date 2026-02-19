@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
+import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,8 @@ import java.util.List;
 public class OutboxService {
     @Value("${spring.kafka.topics.hub}")
     private String hubTopic;
+    @Value("${spring.kafka.topics.hub-route-build:hub-route-build}")
+    private String hubRouteBuildTopic;
     private final OutboxRepository outboxRepository;
     private final OutboxClaimService outboxClaimService;
     private final OutboxDispatcher outboxDispatcher;
@@ -28,11 +31,23 @@ public class OutboxService {
     public void save(OutboxMessage event) {
         try {
             String payload = objectMapper.writeValueAsString(event);
-            OutboxEvent outboxEvent = OutboxEvent.of(event.eventName(), payload, event.eventKey(), hubTopic);
+            OutboxEvent outboxEvent = OutboxEvent.of(
+                    event.eventName(),
+                    payload,
+                    event.eventKey(),
+                    topicFor(event)
+            );
             outboxRepository.save(outboxEvent);
         } catch (JsonProcessingException e) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to serialize event payload");
         }
+    }
+
+    private String topicFor(OutboxMessage event) {
+        if (HubRouteBuildRequestedEvent.class.getSimpleName().equals(event.eventName())) {
+            return hubRouteBuildTopic;
+        }
+        return hubTopic;
     }
 
     public void publishAfterCommit(String eventKey) {

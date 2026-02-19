@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface HubRepository {
     Hub save(Hub hub);
+    void flush();
     Optional<Hub> findById(UUID id);
     Optional<Hub> findByIdIncludingCreating(UUID id);
     Optional<Hub> findByIdIncludingDeleted(UUID id);

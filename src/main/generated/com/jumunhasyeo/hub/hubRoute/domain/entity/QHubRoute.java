@@ -51,7 +51,15 @@ public class QHubRoute extends EntityPathBase<HubRoute> {
     //inherited
     public final NumberPath<Long> modifiedBy = _super.modifiedBy;
 
+    public final DateTimePath<java.time.LocalDateTime> nextRefreshAt = createDateTime("nextRefreshAt", java.time.LocalDateTime.class);
+
     public final DateTimePath<java.time.LocalDateTime> nextRetryAt = createDateTime("nextRetryAt", java.time.LocalDateTime.class);
+
+    public final DateTimePath<java.time.LocalDateTime> refreshClaimedAt = createDateTime("refreshClaimedAt", java.time.LocalDateTime.class);
+
+    public final BooleanPath resolvedByFallback = createBoolean("resolvedByFallback");
+
+    public final EnumPath<RouteProvider> resolvedProvider = createEnum("resolvedProvider", RouteProvider.class);
 
     public final NumberPath<Integer> retryCount = createNumber("retryCount", Integer.class);
 

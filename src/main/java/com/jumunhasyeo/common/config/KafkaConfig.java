@@ -30,6 +30,7 @@ import com.jumunhasyeo.hub.hubRoute.infrastructure.event.HubRouteDlqRecoverer;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @EnableKafka
 @Configuration
@@ -38,7 +39,8 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    private static final String TRANSACTION_ID_PREFIX = "hub-route-tx-";
+    @Value("${spring.kafka.producer.transaction-id-prefix:${spring.application.name:hub-service}-${random.uuid}-}")
+    private String transactionIdPrefix;
 
     @Bean
     public ProducerFactory<String, String> producerFactory() {
@@ -54,8 +56,15 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         DefaultKafkaProducerFactory<String, String> producerFactory = new DefaultKafkaProducerFactory<>(configProps);
-        producerFactory.setTransactionIdPrefix(TRANSACTION_ID_PREFIX);
+        producerFactory.setTransactionIdPrefix(resolveTransactionIdPrefix());
         return producerFactory;
+    }
+
+    private String resolveTransactionIdPrefix() {
+        if (transactionIdPrefix == null || transactionIdPrefix.isBlank()) {
+            return "hub-route-tx-" + UUID.randomUUID() + "-";
+        }
+        return transactionIdPrefix;
     }
 
     @Bean
@@ -122,14 +131,17 @@ public class KafkaConfig {
     public ConcurrentKafkaListenerContainerFactory<String, String> hubRouteKafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,
             HubRouteDlqRecoverer hubRouteDlqRecoverer,
-            KafkaTransactionManager<String, String> kafkaTransactionManager
+            KafkaTransactionManager<String, String> kafkaTransactionManager,
+            @Value("${hub.route.worker.concurrency:3}") int concurrency
     ) {
-        return buildListenerContainerFactory(
+        ConcurrentKafkaListenerContainerFactory<String, String> factory = buildListenerContainerFactory(
                 consumerFactory,
                 hubRouteDlqRecoverer.buildErrorHandler(),
                 ContainerProperties.AckMode.RECORD,
                 kafkaTransactionManager
         );
+        factory.setConcurrency(concurrency);
+        return factory;
     }
 
     private ConcurrentKafkaListenerContainerFactory<String, String> buildListenerContainerFactory(

@@ -9,6 +9,17 @@ spring:
   profiles:
     active: dev
 
+  cloud:
+    openfeign:
+      client:
+        config:
+          kakao-mobility-client:
+            connectTimeout: ${KAKAO_ROUTE_CONNECT_TIMEOUT_MS:1000}
+            readTimeout: ${KAKAO_ROUTE_READ_TIMEOUT_MS:3000}
+          naver-map-client:
+            connectTimeout: ${NAVER_ROUTE_CONNECT_TIMEOUT_MS:1000}
+            readTimeout: ${NAVER_ROUTE_READ_TIMEOUT_MS:3000}
+
   data:
     redis:
       cache:
@@ -27,7 +38,7 @@ spring:
           enabled: false  # TLS 활성화
 
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?reWriteBatchedInserts=true
     username: ${POSTGRES_USERNAME}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -55,6 +66,7 @@ spring:
     # 토픽 설정 (커스텀)
     topics:
       hub: hub
+      hub-route-build: hub-route-build
       order: order
     producer:
       retries: 3
@@ -95,6 +107,9 @@ naver:
     api-key: ${NAVER_MAPS_API_KEY}
 
 hub:
+  api:
+    events:
+      enabled: ${HUB_API_EVENTS_ENABLED:true}
   cache:
     ttl: ${HUB_CACHE_TTL:30m}
     lock-ttl: ${HUB_CACHE_LOCK_TTL:3s}
@@ -104,14 +119,36 @@ hub:
   compensation:
     deleted-by: ${HUB_COMPENSATION_DELETED_BY:0}
   route:
+    worker:
+      enabled: ${HUB_ROUTE_WORKER_ENABLED:true}
+      concurrency: ${HUB_ROUTE_WORKER_CONCURRENCY:3}
     provider-unavailable-ttl: ${HUB_ROUTE_PROVIDER_UNAVAILABLE_TTL:30s}
+    rate-limit:
+      kakao:
+        permits-per-second: ${HUB_ROUTE_KAKAO_PERMITS_PER_SECOND:3}
+      naver:
+        permits-per-second: ${HUB_ROUTE_NAVER_PERMITS_PER_SECOND:3}
+      retry-delay: ${HUB_ROUTE_RATE_LIMIT_RETRY_DELAY:1s}
+      retry-jitter-max: ${HUB_ROUTE_RATE_LIMIT_RETRY_JITTER_MAX:500ms}
+    refresh:
+      enabled: ${HUB_ROUTE_REFRESH_ENABLED:true}
+      interval: ${HUB_ROUTE_REFRESH_INTERVAL:5m}
+      poll-delay-ms: ${HUB_ROUTE_REFRESH_POLL_DELAY_MS:1000}
+      batch-size: ${HUB_ROUTE_REFRESH_BATCH_SIZE:10}
+      stale-timeout: ${HUB_ROUTE_REFRESH_STALE_TIMEOUT:5m}
+      non-retryable-delay: ${HUB_ROUTE_REFRESH_NON_RETRYABLE_DELAY:30m}
+      fallback-reconcile-delay: ${HUB_ROUTE_FALLBACK_RECONCILE_DELAY:1m}
     build:
       scheduler:
         enabled: ${HUB_ROUTE_BUILD_SCHEDULER_ENABLED:true}
       fixed-delay-ms: ${HUB_ROUTE_BUILD_FIXED_DELAY_MS:1000}
       batch-size: ${HUB_ROUTE_BUILD_BATCH_SIZE:10}
       stale-processing-timeout: ${HUB_ROUTE_BUILD_STALE_PROCESSING_TIMEOUT:5m}
-      retry-backoff: ${HUB_ROUTE_BUILD_RETRY_BACKOFF:30s}
+      event-recovery-delay: ${HUB_ROUTE_BUILD_EVENT_RECOVERY_DELAY:5m}
+      primary-retry-delay: ${HUB_ROUTE_PRIMARY_RETRY_DELAY:5s}
+      retry-backoff: ${HUB_ROUTE_BUILD_RETRY_BACKOFF:10s}
+      retry-backoff-max: ${HUB_ROUTE_BUILD_RETRY_BACKOFF_MAX:2m}
+      retry-jitter-max: ${HUB_ROUTE_BUILD_RETRY_JITTER_MAX:2s}
       max-retries: ${HUB_ROUTE_BUILD_MAX_RETRIES:3}
 
 eureka:
@@ -133,27 +170,32 @@ resilience4j:
         registerHealthIndicator: true
         slidingWindowType: TIME_BASED
         slidingWindowSize: 30
-        minimumNumberOfCalls: 5
+        minimumNumberOfCalls: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 5
+        waitDurationInOpenState: 15s
+        permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderTransientException
+        ignoreExceptions:
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteRateLimitExceededException
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteRequestRejectedException
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderConfigurationException
       naverRoute:
         registerHealthIndicator: true
         slidingWindowType: TIME_BASED
         slidingWindowSize: 30
-        minimumNumberOfCalls: 5
+        minimumNumberOfCalls: 10
         failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 5
+        waitDurationInOpenState: 15s
+        permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
-  retry:
-    instances:
-      routeResolve:
-        maxAttempts: 3
-        waitDuration: 500ms
-        enableExponentialBackoff: true
-        exponentialBackoffMultiplier: 2
+        recordExceptions:
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderTransientException
+        ignoreExceptions:
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteRateLimitExceededException
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteRequestRejectedException
+          - com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderConfigurationException
   ratelimiter:
     instances:
       kakaoRoute:

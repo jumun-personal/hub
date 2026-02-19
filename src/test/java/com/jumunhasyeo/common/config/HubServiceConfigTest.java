@@ -1,6 +1,7 @@
 package com.jumunhasyeo.common.config;
 
 import com.jumunhasyeo.hub.hub.application.HubEventPublisher;
+import com.jumunhasyeo.hub.hub.application.HubCacheProperties;
 import com.jumunhasyeo.hub.hub.application.HubRedisCachedDecoratorService;
 import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
@@ -13,6 +14,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -92,6 +95,22 @@ class HubServiceConfigTest {
         @Primary
         RouteProviderAvailabilityService routeProviderAvailabilityService() {
             return mock(RouteProviderAvailabilityService.class);
+        }
+
+        @Bean
+        @SuppressWarnings("unchecked")
+        RedisTemplate<String, Object> redisTemplate() {
+            return mock(RedisTemplate.class);
+        }
+
+        @Bean
+        StringRedisTemplate stringRedisTemplate() {
+            return mock(StringRedisTemplate.class);
+        }
+
+        @Bean
+        HubCacheProperties hubCacheProperties() {
+            return new HubCacheProperties();
         }
     }
 }

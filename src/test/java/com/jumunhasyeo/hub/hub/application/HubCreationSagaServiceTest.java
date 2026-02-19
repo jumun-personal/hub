@@ -2,6 +2,7 @@ package com.jumunhasyeo.hub.hub.application;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
+import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRelationRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -51,8 +52,8 @@ class HubCreationSagaServiceTest {
     }
 
     @Test
-    @DisplayName("허브 경로 생성 완료는 PENDING 상태일 때만 COMPLETE로 전이한다")
-    void complete_whenPendingTransitionSucceeded_marksCompleteOnly() {
+    @DisplayName("허브 경로 생성 완료는 PENDING 상태를 COMPLETE로 전이하고 생성 이벤트를 발행한다")
+    void complete_whenPendingTransitionSucceeded_marksCompleteAndPublishesCreatedEvent() {
         // given
         UUID hubId = UUID.randomUUID();
         Hub hub = createHub(hubId);
@@ -63,9 +64,11 @@ class HubCreationSagaServiceTest {
         hubCreationSagaService.complete(hubId);
 
         // then
+        ArgumentCaptor<HubCreatedEvent> eventCaptor = ArgumentCaptor.forClass(HubCreatedEvent.class);
         then(hubRepository).should().completeIfPending(hubId);
         then(hubRelationRepository).shouldHaveNoInteractions();
-        then(hubEventPublisher).shouldHaveNoInteractions();
+        then(hubEventPublisher).should().publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getHubId()).isEqualTo(hubId);
     }
 
     @Test

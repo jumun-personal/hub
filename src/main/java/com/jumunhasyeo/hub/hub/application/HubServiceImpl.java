@@ -7,7 +7,6 @@ import com.jumunhasyeo.hub.hub.application.command.DeleteHubCommand;
 import com.jumunhasyeo.hub.hub.application.command.UpdateHubCommand;
 import com.jumunhasyeo.hub.hub.application.dto.response.HubRes;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
-import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubNameUpdatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
@@ -16,7 +15,8 @@ import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
-import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
+import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,12 +33,10 @@ public class HubServiceImpl implements HubService{
     private final HubRepository hubRepository;
     private final HubRepositoryCustom hubRepositoryCustom;
     private final HubEventPublisher hubEventPublisher;
-    private final RouteProviderAvailabilityService routeProviderAvailabilityService;
+    private final HubRouteService hubRouteService;
 
     @Transactional
     public HubRes create(CreateHubCommand command) {
-        routeProviderAvailabilityService.assertRouteCreationAvailable();
-
         Coordinate coordinate = Coordinate.of(command.latitude(), command.longitude());
         Address address = Address.of(command.address(), coordinate);
         Hub hub = Hub.of(command.name(), address, command.hubType());
@@ -102,14 +100,25 @@ public class HubServiceImpl implements HubService{
 
     private void createCenterHub(Hub hub) {
         hubRepository.save(hub);
-        hubEventPublisher.publishEvent(HubCreatedEvent.centerHub(hub));
+        prepareRouteSkeletons(null, hub);
     }
 
     private void createBranchHub(UUID centerHubId, Hub hub) {
         Hub centerHub = getHub(centerHubId);
         hub.addCenterHub(centerHub);
         hubRepository.save(hub);
-        hubEventPublisher.publishEvent(HubCreatedEvent.branchHub(hub, centerHub.getHubId()));
+        prepareRouteSkeletons(centerHub.getHubId(), hub);
+    }
+
+    private void prepareRouteSkeletons(UUID centerHubId, Hub hub) {
+        hubRepository.flush();
+        hubRouteService.buildRoutesForNewHub(new BuildRouteCommand(
+                centerHubId,
+                hub.getHubId(),
+                hub.getName(),
+                hub.getAddress(),
+                hub.getHubType()
+        ));
     }
 
     private boolean isChangedName(String preName, Hub hub) {

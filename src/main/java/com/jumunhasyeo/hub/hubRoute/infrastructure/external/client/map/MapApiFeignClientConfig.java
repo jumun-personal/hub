@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.infrastructure.external.client.map;
 
+import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
 import feign.Logger;
 import feign.codec.ErrorDecoder;
 import lombok.extern.slf4j.Slf4j;
@@ -20,18 +21,7 @@ public class MapApiFeignClientConfig {
             log.error("Kakao Mobility API Error: {} - {}",
                     response.status(), response.reason());
 
-            switch (response.status()) {
-                case 400:
-                    return new IllegalArgumentException("잘못된 요청입니다.");
-                case 401:
-                    return new IllegalStateException("인증 실패: API 키를 확인하세요.");
-                case 429:
-                    return new IllegalStateException("API 호출 한도 초과");
-                case 500:
-                    return new IllegalStateException("Kakao 서버 오류");
-                default:
-                    return new RuntimeException("알 수 없는 오류: " + response.status());
-            }
+            return RouteApiErrorDecoderSupport.decode(MapProvider.KAKAO, response);
         };
     }
 }

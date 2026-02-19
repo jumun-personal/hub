@@ -4,6 +4,7 @@ import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.LockModeType;
 
 public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID> {
 
@@ -115,6 +117,61 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
             @Param("staleBefore") java.time.LocalDateTime staleBefore
     );
 
+    @Query(value = """
+            SELECT route_id
+            FROM p_hub_route
+            WHERE is_deleted = false
+              AND (
+                    (
+                        route_status = 'PENDING'
+                        AND next_retry_at IS NOT NULL
+                        AND next_retry_at <= :now
+                    )
+                    OR (
+                        route_status = 'PROCESSING'
+                        AND modified_at < :staleBefore
+                    )
+              )
+            ORDER BY COALESCE(next_retry_at, modified_at), created_at
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findRecoveryTargetIds(
+            @Param("limit") int limit,
+            @Param("now") java.time.LocalDateTime now,
+            @Param("staleBefore") java.time.LocalDateTime staleBefore
+    );
+
+    @Query(value = """
+            SELECT route_id
+            FROM p_hub_route
+            WHERE is_deleted = false
+              AND route_status = 'COMPLETE'
+              AND (next_refresh_at IS NULL OR next_refresh_at <= :now)
+              AND (refresh_claimed_at IS NULL OR refresh_claimed_at < :staleBefore)
+            ORDER BY next_refresh_at NULLS FIRST, created_at
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findRefreshTargetIds(
+            @Param("limit") int limit,
+            @Param("now") java.time.LocalDateTime now,
+            @Param("staleBefore") java.time.LocalDateTime staleBefore
+    );
+
+    @Query(value = """
+            SELECT pair.route_id
+            FROM p_hub_route seed
+            JOIN p_hub_route pair
+              ON pair.build_hub_id IS NOT DISTINCT FROM seed.build_hub_id
+             AND pair.is_deleted = false
+             AND (
+                    (pair.start_hub_id = seed.start_hub_id AND pair.end_hub_id = seed.end_hub_id)
+                 OR (pair.start_hub_id = seed.end_hub_id AND pair.end_hub_id = seed.start_hub_id)
+             )
+            WHERE seed.route_id = :routeId
+            ORDER BY pair.route_id
+            """, nativeQuery = true)
+    List<UUID> findRoutePairIds(@Param("routeId") UUID routeId);
+
     @Modifying
     @Query("""
             UPDATE HubRoute route
@@ -138,6 +195,28 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
             WHERE route.routeId = :routeId
             """)
     Optional<HubRoute> findByIdWithHubs(@Param("routeId") UUID routeId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT route
+            FROM HubRoute route
+            JOIN FETCH route.startHub
+            JOIN FETCH route.endHub
+            WHERE route.routeId IN :routeIds
+            ORDER BY route.routeId
+            """)
+    List<HubRoute> findAllByIdsWithHubsForUpdate(@Param("routeIds") List<UUID> routeIds);
+
+    @Query("""
+            SELECT COUNT(route) > 0
+            FROM HubRoute route
+            WHERE route.isDeleted = false
+              AND route.status IN (
+                    com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.PENDING,
+                    com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.PROCESSING
+              )
+            """)
+    boolean existsActiveBuildWork();
 
     @Query("""
             SELECT COUNT(route) > 0

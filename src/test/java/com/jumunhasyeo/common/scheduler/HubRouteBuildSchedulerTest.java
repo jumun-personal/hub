@@ -7,6 +7,7 @@ import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
+import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightApiService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,8 @@ class HubRouteBuildSchedulerTest {
 
     @Mock
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
+    @Mock
+    private RoutePairBuildProcessor routePairBuildProcessor;
 
     private HubRouteBuildScheduler scheduler;
 
@@ -47,13 +50,11 @@ class HubRouteBuildSchedulerTest {
     void setUp() {
         scheduler = new HubRouteBuildScheduler(
                 hubRouteService,
-                routeWeightApiService,
-                routeProviderAvailabilityService
+                routeProviderAvailabilityService,
+                routePairBuildProcessor
         );
         ReflectionTestUtils.setField(scheduler, "batchSize", 10);
         ReflectionTestUtils.setField(scheduler, "staleProcessingTimeout", "5m");
-        ReflectionTestUtils.setField(scheduler, "retryBackoff", "30s");
-        ReflectionTestUtils.setField(scheduler, "maxRetries", 3);
     }
 
     @Test
@@ -66,49 +67,26 @@ class HubRouteBuildSchedulerTest {
         scheduler.buildPendingRoutes();
 
         // then
-        then(hubRouteService).should(never()).claimRouteBuildTargets(anyInt(), any(Duration.class));
-        then(routeWeightApiService).shouldHaveNoInteractions();
+        then(hubRouteService).should(never()).findRouteBuildRecoveryTargets(anyInt(), any(Duration.class));
+        then(routePairBuildProcessor).shouldHaveNoInteractions();
     }
 
     @Test
-    @DisplayName("claim한 경로의 지도 API 호출이 성공하면 경로 가중치 완료 저장을 요청한다")
-    void buildPendingRoutes_whenApiSucceeds_completesRouteBuild() {
+    @DisplayName("재시도 시간이 지난 경로 쌍을 복구 처리기에 전달한다")
+    void buildPendingRoutes_whenRecoveryIsDue_delegatesRoutePair() {
         // given
         UUID routeId = UUID.randomUUID();
-        RouteBuildTarget target = routeBuildTarget(routeId);
+        List<UUID> routePairIds = List.of(routeId, UUID.randomUUID());
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRouteBuildTargets(eq(10), eq(Duration.ofMinutes(5))))
+        given(hubRouteService.findRouteBuildRecoveryTargets(eq(10), eq(Duration.ofMinutes(5))))
                 .willReturn(List.of(routeId));
-        given(hubRouteService.getRouteBuildTarget(routeId)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any()))
-                .willReturn(new RouteWeightResult(BigDecimal.valueOf(12.3), 25, MapProvider.KAKAO, false));
+        given(hubRouteService.findRoutePairIds(routeId)).willReturn(routePairIds);
 
         // when
         scheduler.buildPendingRoutes();
 
         // then
-        then(hubRouteService).should().completeRouteBuild(eq(routeId), any());
-        then(hubRouteService).should(never()).failRouteBuild(any(), any(), anyInt(), any(Duration.class));
-    }
-
-    @Test
-    @DisplayName("claim한 경로의 지도 API 호출이 실패하면 경로 재시도 저장을 요청한다")
-    void buildPendingRoutes_whenApiFails_recordsRouteBuildFailure() {
-        // given
-        UUID routeId = UUID.randomUUID();
-        RouteBuildTarget target = routeBuildTarget(routeId);
-        given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRouteBuildTargets(eq(10), eq(Duration.ofMinutes(5))))
-                .willReturn(List.of(routeId));
-        given(hubRouteService.getRouteBuildTarget(routeId)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any())).willThrow(new RuntimeException("map down"));
-
-        // when
-        scheduler.buildPendingRoutes();
-
-        // then
-        then(hubRouteService).should().failRouteBuild(routeId, "map down", 3, Duration.ofSeconds(30));
-        then(hubRouteService).should(never()).completeRouteBuild(any(), any());
+        then(routePairBuildProcessor).should().process(routePairIds);
     }
 
     private RouteBuildTarget routeBuildTarget(UUID routeId) {

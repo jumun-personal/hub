@@ -7,6 +7,7 @@ import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -18,6 +19,7 @@ import static com.jumunhasyeo.hub.hub.infrastructure.event.ListenEventRegistry.H
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "hub.api.events.enabled", havingValue = "true", matchIfMissing = true)
 public class HubDlqKafkaEventListener {
 
     private static final String UNKNOWN_FAILURE_REASON = "Hub route build failed and moved to DLQ";

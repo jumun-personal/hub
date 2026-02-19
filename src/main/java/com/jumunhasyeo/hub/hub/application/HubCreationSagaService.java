@@ -3,6 +3,7 @@ package com.jumunhasyeo.hub.hub.application;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRelationRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -32,6 +33,7 @@ public class HubCreationSagaService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
         int updated = hubRepository.completeIfPending(hubId);
         if (updated == 1) {
+            hubEventPublisher.publishEvent(HubCreatedEvent.from(hub));
             log.info("Hub route build completed. hubId={}", hubId);
             return;
         }

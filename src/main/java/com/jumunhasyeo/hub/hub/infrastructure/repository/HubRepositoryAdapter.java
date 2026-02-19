@@ -23,6 +23,11 @@ public class HubRepositoryAdapter implements HubRepository {
     }
 
     @Override
+    public void flush() {
+        jpaHubRepository.flush();
+    }
+
+    @Override
     public Optional<Hub> findById(UUID id) {
         return jpaHubRepository.findById(id, HubStatus.COMPLETE);
     }
