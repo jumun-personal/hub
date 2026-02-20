@@ -3,6 +3,7 @@ package com.jumunhasyeo.hub.hubRoute.infrastructure.external.client.map;
 import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderConfigurationException;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderTransientException;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderFailureType;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteRateLimitExceededException;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteRequestRejectedException;
 import feign.Request;
@@ -63,6 +64,8 @@ class RouteApiErrorDecoderSupportTest {
         );
 
         assertThat(result).isInstanceOf(RouteProviderTransientException.class);
+        assertThat(((RouteProviderTransientException) result).failureType())
+                .isEqualTo(RouteProviderFailureType.SERVER_ERROR);
     }
 
     private Response response(int status, Map<String, java.util.Collection<String>> headers) {

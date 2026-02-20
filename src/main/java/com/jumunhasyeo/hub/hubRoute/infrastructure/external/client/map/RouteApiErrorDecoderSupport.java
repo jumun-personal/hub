@@ -3,6 +3,7 @@ package com.jumunhasyeo.hub.hubRoute.infrastructure.external.client.map;
 import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderConfigurationException;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderTransientException;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderFailureType;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteRateLimitExceededException;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteRequestRejectedException;
 import feign.Response;
@@ -32,7 +33,11 @@ final class RouteApiErrorDecoderSupport {
             return new RouteRateLimitExceededException(provider, retryAfter(response));
         }
         if (status >= 500) {
-            return new RouteProviderTransientException(provider, message(provider, status, "server error"));
+            return new RouteProviderTransientException(
+                    provider,
+                    RouteProviderFailureType.SERVER_ERROR,
+                    message(provider, status, "server error")
+            );
         }
         return new RouteRequestRejectedException(provider, message(provider, status, "non-retryable response"));
     }

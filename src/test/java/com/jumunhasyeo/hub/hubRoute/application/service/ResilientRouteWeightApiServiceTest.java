@@ -12,6 +12,8 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.springboot3.circuitbreaker.autoconfigure.CircuitBreakerAutoConfiguration;
 import io.github.resilience4j.springboot3.ratelimiter.autoconfigure.RateLimiterAutoConfiguration;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,7 @@ import static org.mockito.Mockito.times;
 @SpringJUnitConfig
 @ContextConfiguration(classes = {
         ResilientRouteWeightApiService.class,
+        RouteProviderMetrics.class,
         ResilientRouteWeightApiServiceTest.TestConfig.class
 })
 @ImportAutoConfiguration({
@@ -96,6 +99,9 @@ class ResilientRouteWeightApiServiceTest {
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
     @Autowired
     private DistributedRouteRateLimiter distributedRouteRateLimiter;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -321,6 +327,54 @@ class ResilientRouteWeightApiServiceTest {
                 .isEqualTo("TIME_BASED");
     }
 
+    @Test
+    @DisplayName("정상적인 Kakao 최초 호출은 응답시간과 성공 횟수를 기록한다")
+    void getRouteInfo_whenInitialKakaoSucceeds_recordsLatencyAndSuccess() {
+        // given
+        RouteWeightQuery query = routeWeightQuery(ProviderHint.PRIMARY);
+        given(kakaoStrategy.getWeight(any())).willReturn(routeWeightResult(MapProvider.KAKAO));
+        double successBefore = counter(
+                "kakao",
+                "initial",
+                "success"
+        );
+        long latencyBefore = timerCount("kakao");
+
+        // when
+        routeWeightApiService.getRouteInfo(query);
+
+        // then
+        assertThat(counter("kakao", "initial", "success"))
+                .isEqualTo(successBefore + 1);
+        assertThat(timerCount("kakao")).isEqualTo(latencyBefore + 1);
+    }
+
+    @Test
+    @DisplayName("Kakao 재시도 Timeout과 Naver Fallback 성공은 하나의 호출 결과 지표로 구분한다")
+    void getRouteInfo_whenRetryTimesOutAndFallbackSucceeds_recordsBoundedOutcomes() {
+        // given
+        RouteWeightQuery query = routeWeightQuery(ProviderHint.ANY);
+        given(kakaoStrategy.getWeight(any())).willThrow(
+                new RouteProviderTransientException(
+                        MapProvider.KAKAO,
+                        RouteProviderFailureType.TIMEOUT,
+                        "temporary timeout"
+                )
+        );
+        given(naverStrategy.getWeight(any())).willReturn(routeWeightResult(MapProvider.NAVER));
+        double timeoutBefore = counter("kakao", "retry", "timeout");
+        double fallbackSuccessBefore = counter("naver", "fallback", "success");
+
+        // when
+        routeWeightApiService.getRouteInfo(query);
+
+        // then
+        assertThat(counter("kakao", "retry", "timeout"))
+                .isEqualTo(timeoutBefore + 1);
+        assertThat(counter("naver", "fallback", "success"))
+                .isEqualTo(fallbackSuccessBefore + 1);
+    }
+
     private static RouteWeightQuery routeWeightQuery() {
         return routeWeightQuery(ProviderHint.ANY);
     }
@@ -342,6 +396,24 @@ class ResilientRouteWeightApiServiceTest {
                 provider,
                 false
         );
+    }
+
+    private double counter(String provider, String phase, String outcome) {
+        var counter = meterRegistry.find("route.provider.calls")
+                .tags(
+                        "provider", provider,
+                        "phase", phase,
+                        "outcome", outcome
+                )
+                .counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    private long timerCount(String provider) {
+        var timer = meterRegistry.find("route.provider.call.duration")
+                .tag("provider", provider)
+                .timer();
+        return timer == null ? 0 : timer.count();
     }
 
     @Configuration
@@ -366,6 +438,11 @@ class ResilientRouteWeightApiServiceTest {
         @Bean
         DistributedRouteRateLimiter distributedRouteRateLimiter() {
             return mock(DistributedRouteRateLimiter.class);
+        }
+
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
         }
     }
 }

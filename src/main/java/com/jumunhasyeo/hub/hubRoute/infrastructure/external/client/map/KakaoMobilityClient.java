@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @FeignClient(
         name = "kakao-mobility-client",
-        url = "https://apis-navi.kakaomobility.com",
+        url = "${kakao.mobility.base-url:https://apis-navi.kakaomobility.com}",
         configuration = MapApiFeignClientConfig.class
 )
 public interface KakaoMobilityClient {

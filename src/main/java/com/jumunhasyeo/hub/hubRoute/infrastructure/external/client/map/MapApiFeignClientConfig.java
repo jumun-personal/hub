@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class MapApiFeignClientConfig {
     @Bean(name = "kakaoFeignLoggerLevel")
     Logger.Level kakaoFeignLoggerLevel() {
-        return Logger.Level.FULL;  // TODO 개발 시: FULL, 운영 시: BASIC
+        return Logger.Level.BASIC;
     }
 
     @Bean(name = "kakaoErrorDecoder")
