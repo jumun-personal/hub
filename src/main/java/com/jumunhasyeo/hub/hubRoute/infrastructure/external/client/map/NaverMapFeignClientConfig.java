@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class NaverMapFeignClientConfig {
     @Bean(name = "naverFeignLoggerLevel")
     Logger.Level naverFeignLoggerLevel() {
-        return Logger.Level.FULL;
+        return Logger.Level.BASIC;
     }
 
     @Bean(name = "naverErrorDecoder")

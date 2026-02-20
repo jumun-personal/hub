@@ -16,10 +16,10 @@ spring:
         config:
           kakao-mobility-client:
             connectTimeout: 1000
-            readTimeout: 3000
+            readTimeout: 4000
           naver-map-client:
             connectTimeout: 1000
-            readTimeout: 3000
+            readTimeout: 4000
 
   task:
     scheduling:
@@ -113,11 +113,12 @@ dynamic:
 # 외부 API 설정
 kakao:
   mobility:
+    base-url: http://localhost:18080
     api-key: dummy-kakao-api-key-for-test
 
 naver:
   maps:
-    base-url: https://naveropenapi.apigw.ntruss.com
+    base-url: https://maps.apigw.ntruss.com
     api-key-id: dummy-naver-api-key-id-for-test
     api-key: dummy-naver-api-key-for-test
 

@@ -75,7 +75,12 @@ public class KakaoWeightRouteApiServiceImpl implements RouteWeightStrategy {
                  | RouteProviderTransientException e) {
             throw e;
         } catch (RetryableException e) {
-            throw new RouteProviderTransientException(MapProvider.KAKAO, "Kakao route API connection failed", e);
+            throw new RouteProviderTransientException(
+                    MapProvider.KAKAO,
+                    RouteProviderFeignFailureClassifier.classify(e),
+                    "Kakao route API connection failed",
+                    e
+            );
         } catch (Exception e) {
             log.error("Failed to get route from Kakao API, {}", e.toString());
             throw new RouteProviderTransientException(MapProvider.KAKAO, "Kakao route response handling failed", e);

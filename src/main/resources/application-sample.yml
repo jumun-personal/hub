@@ -15,10 +15,10 @@ spring:
         config:
           kakao-mobility-client:
             connectTimeout: ${KAKAO_ROUTE_CONNECT_TIMEOUT_MS:1000}
-            readTimeout: ${KAKAO_ROUTE_READ_TIMEOUT_MS:3000}
+            readTimeout: ${KAKAO_ROUTE_READ_TIMEOUT_MS:4000}
           naver-map-client:
             connectTimeout: ${NAVER_ROUTE_CONNECT_TIMEOUT_MS:1000}
-            readTimeout: ${NAVER_ROUTE_READ_TIMEOUT_MS:3000}
+            readTimeout: ${NAVER_ROUTE_READ_TIMEOUT_MS:4000}
 
   data:
     redis:
@@ -98,11 +98,12 @@ cache:
 
 kakao:
   mobility:
+    base-url: ${KAKAO_MOBILITY_BASE_URL:https://apis-navi.kakaomobility.com}
     api-key: ${KAKAO_MOBILITY_API_KEY}
 
 naver:
   maps:
-    base-url: ${NAVER_MAPS_BASE_URL:https://naveropenapi.apigw.ntruss.com}
+    base-url: ${NAVER_MAPS_BASE_URL:https://maps.apigw.ntruss.com}
     api-key-id: ${NAVER_MAPS_API_KEY_ID}
     api-key: ${NAVER_MAPS_API_KEY}
 

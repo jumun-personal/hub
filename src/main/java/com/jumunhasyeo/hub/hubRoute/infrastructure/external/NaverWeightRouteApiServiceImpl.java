@@ -63,7 +63,12 @@ public class NaverWeightRouteApiServiceImpl implements RouteWeightStrategy {
                  | RouteProviderTransientException e) {
             throw e;
         } catch (RetryableException e) {
-            throw new RouteProviderTransientException(MapProvider.NAVER, "Naver route API connection failed", e);
+            throw new RouteProviderTransientException(
+                    MapProvider.NAVER,
+                    RouteProviderFeignFailureClassifier.classify(e),
+                    "Naver route API connection failed",
+                    e
+            );
         } catch (Exception e) {
             log.error("Failed to get route from Naver API, {}", e.toString());
             throw new RouteProviderTransientException(MapProvider.NAVER, "Naver route response handling failed", e);

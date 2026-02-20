@@ -18,6 +18,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.function.Supplier;
 
+import static com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderMetrics.RouteCallPhase.FALLBACK;
+import static com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderMetrics.RouteCallPhase.INITIAL;
+import static com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderMetrics.RouteCallPhase.RETRY;
+
 @Service
 @Primary
 @RequiredArgsConstructor
@@ -31,6 +35,7 @@ public class ResilientRouteWeightApiService implements RouteWeightApiService {
     private final RateLimiterRegistry rateLimiterRegistry;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
     private final DistributedRouteRateLimiter distributedRouteRateLimiter;
+    private final RouteProviderMetrics routeProviderMetrics;
 
     @Override
     public RouteWeightResult getRouteInfo(RouteWeightQuery query) {
@@ -71,7 +76,8 @@ public class ResilientRouteWeightApiService implements RouteWeightApiService {
         return callProvider(
                 MapProvider.KAKAO,
                 KAKAO_ROUTE,
-                () -> kakaoStrategy.getWeight(query)
+                () -> kakaoStrategy.getWeight(query),
+                query.providerHint() == ProviderHint.ANY ? RETRY : INITIAL
         );
     }
 
@@ -80,7 +86,8 @@ public class ResilientRouteWeightApiService implements RouteWeightApiService {
             RouteWeightResult result = callProvider(
                     MapProvider.NAVER,
                     NAVER_ROUTE,
-                    () -> naverStrategy.getWeight(query)
+                    () -> naverStrategy.getWeight(query),
+                    FALLBACK
             );
             return new RouteWeightResult(
                     result.distanceKm(),
@@ -109,12 +116,17 @@ public class ResilientRouteWeightApiService implements RouteWeightApiService {
     private RouteWeightResult callProvider(
             MapProvider provider,
             String circuitBreakerName,
-            Supplier<RouteWeightResult> apiCall
+            Supplier<RouteWeightResult> apiCall,
+            RouteProviderMetrics.RouteCallPhase phase
     ) {
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(circuitBreakerName);
         Supplier<RouteWeightResult> protectedCall = CircuitBreaker.decorateSupplier(
                 circuitBreaker,
-                () -> callWithinRateLimit(provider, circuitBreakerName, apiCall)
+                () -> callWithinRateLimit(
+                        provider,
+                        circuitBreakerName,
+                        () -> routeProviderMetrics.observe(provider, phase, apiCall)
+                )
         );
         return protectedCall.get();
     }
