@@ -21,6 +21,21 @@ configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
+    benchmarkImplementation {
+        extendsFrom implementation
+    }
+    benchmarkRuntimeOnly {
+        extendsFrom runtimeOnly
+    }
+}
+
+sourceSets {
+    benchmark {
+        java.srcDir 'benchmark'
+        resources.srcDirs = []
+        compileClasspath += sourceSets.main.runtimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
 }
 
 repositories {
@@ -119,6 +134,13 @@ dependencies {
     implementation 'io.micrometer:micrometer-observation'
     implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.0'
     implementation 'io.opentelemetry.instrumentation:opentelemetry-kafka-clients-2.6:2.11.0-alpha'
+}
+
+tasks.register('hubRouteInsertBenchmark', JavaExec) {
+    group = 'verification'
+    description = '경로 저장 전략별 JDBC·Commit·WAL 비용을 측정합니다.'
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'HubRouteInsertBenchmark'
 }
 
 dependencyManagement {
