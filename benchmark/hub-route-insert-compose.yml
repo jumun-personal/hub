@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: benchdb
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: benchpass
+    ports:
+      - "55432:5432"
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - track_wal_io_timing=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bench -d benchdb"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./init-hub-route-insert.sql:/docker-entrypoint-initdb.d/init.sql:ro
