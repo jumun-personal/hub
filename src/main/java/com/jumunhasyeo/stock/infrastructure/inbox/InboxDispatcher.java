@@ -51,7 +51,7 @@ public class InboxDispatcher {
 
     private List<IncreaseStockCommand> toPayload(List<StockHistory> histories) {
         return histories.stream()
-                .map(history -> new IncreaseStockCommand(history.getProductId(), history.getQuantity()))
+                .map(history -> new IncreaseStockCommand(history.getHubId(), history.getProductId(), history.getQuantity()))
                 .toList();
     }
 

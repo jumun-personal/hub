@@ -12,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 
@@ -153,5 +155,49 @@ class IdempotentAspectTest {
 
         assertThat(result).isEqualTo(EXPECTED_RESULT);
         then(stringRedisTemplate).should(never()).delete(TEST_KEY);
+    }
+
+    @Test
+    @DisplayName("트랜잭션 동기화가 활성화되어 있으면 커밋 이후 SUCCESS 상태를 저장한다.")
+    void handleIdempotency_marks_success_after_commit_when_transaction_synchronization_active() throws Throwable {
+        given(valueOperations.setIfAbsent(TEST_KEY, IdempotentStatus.PROCESSING.name(), PROCESSING_TTL)).willReturn(true);
+        given(joinPoint.proceed()).willReturn(EXPECTED_RESULT);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            Object result = idempotentAspect.handleIdempotency(joinPoint, idempotent);
+
+            assertThat(result).isEqualTo(EXPECTED_RESULT);
+            then(valueOperations).should(never()).set(TEST_KEY, IdempotentStatus.SUCCESS.name(), SUCCESS_TTL);
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+
+            then(valueOperations).should().set(TEST_KEY, IdempotentStatus.SUCCESS.name(), SUCCESS_TTL);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("트랜잭션 동기화가 활성화된 요청이 롤백되면 PROCESSING 키를 삭제한다.")
+    void handleIdempotency_deletes_processing_key_after_rollback_when_transaction_synchronization_active() throws Throwable {
+        given(valueOperations.setIfAbsent(TEST_KEY, IdempotentStatus.PROCESSING.name(), PROCESSING_TTL)).willReturn(true);
+        given(joinPoint.proceed()).willReturn(EXPECTED_RESULT);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            Object result = idempotentAspect.handleIdempotency(joinPoint, idempotent);
+
+            assertThat(result).isEqualTo(EXPECTED_RESULT);
+            then(valueOperations).should(never()).set(TEST_KEY, IdempotentStatus.SUCCESS.name(), SUCCESS_TTL);
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+
+            then(stringRedisTemplate).should().delete(TEST_KEY);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }

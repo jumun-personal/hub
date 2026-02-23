@@ -5,12 +5,10 @@ import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
-import com.jumunhasyeo.stock.application.dto.response.StockRes;
-import com.jumunhasyeo.stock.domain.entity.Stock;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
 import com.jumunhasyeo.stock.domain.entity.StockHistory;
 import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,8 +17,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +29,6 @@ public class StockVariationServiceImpl implements StockVariationService {
 
     private final StockRepository stockRepository;
     private final StockHistoryRepository stockHistoryRepository;
-    private final EntityManager entityManager;
 
     @Override
     public StockLockType type() {
@@ -39,59 +36,68 @@ public class StockVariationServiceImpl implements StockVariationService {
     }
 
     @Override
-    public StockRes decrement(DecreaseStockCommand command) {
-        Stock stock = getStock(command.productId());
-        StockRes preview = previewAfterDecrease(stock, command.amount());
-        stockRepository.decreaseStock(stock.getStockId(), command.amount());
-        return preview;
-    }
-
-    @Override
     @Transactional
-    public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
-        List<StockRes> results = commands.stream()
-                .map(this::decrement)
-                .toList();
-        saveDecreaseHistories(idempotencyKey, results, commands);
+    public List<StockChangeRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
+        List<StockChangeRes> results = new ArrayList<>();
+
+        for (DecreaseStockCommand command : commands) {
+            // 조건부 UPDATE
+            boolean decreased = stockRepository.decreaseStock(command.hubId(), command.productId(), command.amount());
+            if (!decreased) {
+                throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+            }
+
+            results.add(StockChangeRes.decrease(
+                    command.hubId(),
+                    command.productId(),
+                    command.amount()
+            ));
+        }
+
+        // 재고 차감 이력 저장
+        saveDecreaseHistories(idempotencyKey, results);
         return results;
     }
 
     @Override
-    public StockRes increment(IncreaseStockCommand command) {
-        Stock stock = getStock(command.productId());
-        StockRes preview = previewAfterIncrease(stock, command.amount());
-        stockRepository.increaseStock(stock.getStockId(), command.amount());
-        return preview;
-    }
-
-    @Override
     @Transactional
-    public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
-        List<StockRes> results = commands.stream()
+    public List<StockChangeRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
+        List<StockChangeRes> results = commands.stream()
                 .map(this::increment)
                 .toList();
-        saveIncreaseHistories(idempotencyKey, results, commands);
+        // 재고 증가 이력 저장
+        saveIncreaseHistories(idempotencyKey, results);
         return results;
     }
 
-    private void saveDecreaseHistories(String idempotencyKey, List<StockRes> results, List<DecreaseStockCommand> commands) {
+    private StockChangeRes increment(IncreaseStockCommand command) {
+        // 조건부 UPDATE
+        boolean increased = stockRepository.increaseStock(command.hubId(), command.productId(), command.amount());
+        if (!increased) {
+            throw new BusinessException(ErrorCode.STOCK_MAX_EXCEEDED);
+        }
+
+        return StockChangeRes.increase(command.hubId(), command.productId(), command.amount());
+    }
+
+    private void saveDecreaseHistories(String idempotencyKey, List<StockChangeRes> results) {
         List<StockHistory> histories = results.stream()
                 .map(result -> StockHistory.ofDecrease(
                         result.hubId(),
                         result.productId(),
-                        findDecreaseAmount(result.productId(), commands),
+                        result.quantity(),
                         idempotencyKey
                 ))
                 .toList();
         saveHistories(histories);
     }
 
-    private void saveIncreaseHistories(String idempotencyKey, List<StockRes> results, List<IncreaseStockCommand> commands) {
+    private void saveIncreaseHistories(String idempotencyKey, List<StockChangeRes> results) {
         List<StockHistory> histories = results.stream()
                 .map(result -> StockHistory.ofIncrease(
                         result.hubId(),
                         result.productId(),
-                        findIncreaseAmount(result.productId(), commands),
+                        result.quantity(),
                         idempotencyKey
                 ))
                 .toList();
@@ -106,36 +112,4 @@ public class StockVariationServiceImpl implements StockVariationService {
         }
     }
 
-    private StockRes previewAfterDecrease(Stock stock, int amount) {
-        entityManager.detach(stock);
-        stock.decrease(amount);
-        return StockRes.from(stock);
-    }
-
-    private StockRes previewAfterIncrease(Stock stock, int amount) {
-        entityManager.detach(stock);
-        stock.increase(amount);
-        return StockRes.from(stock);
-    }
-
-    private int findDecreaseAmount(UUID productId, List<DecreaseStockCommand> commands) {
-        return commands.stream()
-                .filter(command -> command.productId().equals(productId))
-                .findFirst()
-                .map(DecreaseStockCommand::amount)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "재고 감소 이력 수량을 찾을 수 없습니다."));
-    }
-
-    private int findIncreaseAmount(UUID productId, List<IncreaseStockCommand> commands) {
-        return commands.stream()
-                .filter(command -> command.productId().equals(productId))
-                .findFirst()
-                .map(IncreaseStockCommand::amount)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "재고 증가 이력 수량을 찾을 수 없습니다."));
-    }
-
-    private Stock getStock(UUID productId) {
-        return stockRepository.findByProductId(productId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_EXCEPTION, "productId = "+productId));
-    }
 }

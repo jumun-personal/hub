@@ -19,30 +19,34 @@ public class StockRepositoryAdapter implements StockRepository {
     private final JpaStockRepository jpaStockRepository;
 
     @Override
-    public Optional<Stock> findByProductId(UUID productId) {
-        return jpaStockRepository.findByProductId(productId)
-                .stream()
-                .findFirst();
+    public Optional<Stock> findByHubIdAndProductId(UUID hubId, UUID productId) {
+        return jpaStockRepository.findByHubIdAndProductId(hubId, productId);
     }
 
     @Override
-    public Optional<Stock> findByProductIdWithLock(UUID productId) {
-        return jpaStockRepository.findStockByProductIdWithLock(productId);
+    public Optional<Stock> findByHubIdAndProductIdWithLock(UUID hubId, UUID productId) {
+        return jpaStockRepository.findStockByHubIdAndProductIdWithLock(hubId, productId);
     }
 
     @Override
-    public boolean decreaseStock(UUID stockId, int amount) {
-        boolean isSuccess = jpaStockRepository.decreaseStock(stockId, amount) == 1;
+    public boolean decreaseStock(UUID hubId, UUID productId, int amount) {
+        boolean isSuccess = jpaStockRepository.decreaseStock(hubId, productId, amount) == 1;
         if (!isSuccess) {
+            if (jpaStockRepository.findByHubIdAndProductId(hubId, productId).isEmpty()) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_EXCEPTION, "hubId = " + hubId + ", productId = " + productId);
+            }
             throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
         }
         return isSuccess;
     }
 
     @Override
-    public boolean increaseStock(UUID stockId, int amount) {
-        boolean isSuccess = jpaStockRepository.increaseStock(stockId, amount) == 1;
+    public boolean increaseStock(UUID hubId, UUID productId, int amount) {
+        boolean isSuccess = jpaStockRepository.increaseStock(hubId, productId, amount) == 1;
         if (!isSuccess) {
+            if (jpaStockRepository.findByHubIdAndProductId(hubId, productId).isEmpty()) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_EXCEPTION, "hubId = " + hubId + ", productId = " + productId);
+            }
             throw new BusinessException(ErrorCode.STOCK_MAX_EXCEEDED);
         }
         return isSuccess;

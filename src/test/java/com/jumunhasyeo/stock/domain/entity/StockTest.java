@@ -17,14 +17,16 @@ class StockTest {
 
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 2, 10})
-    @DisplayName("quantity >=0 인 경우 생성할 수 있다.")
-    public void of_stock_success() {
+    @DisplayName("재고 수량이 0 이상이면 재고를 생성할 수 있다")
+    void of_stock_success(int quantity) {
         // given
-        Hub hub = createHub();
+        UUID productId = UUID.randomUUID();
+
         // when
-        Stock stock = createStock(UUID.randomUUID(), 100);
+        Stock stock = createStock(productId, quantity);
+
         // then
-        assertThat(stock.getQuantity()).isEqualTo(100);
+        assertThat(stock.getQuantity()).isEqualTo(quantity);
     }
 
     @Test
@@ -86,6 +88,18 @@ class StockTest {
         assertThat(stock.getQuantity()).isEqualTo(50);
     }
 
+    @Test
+    @DisplayName("재고 변경 수량 양수 검증은 재고 수량을 변경하지 않는다.")
+    public void validate_positive_amount_does_not_change_quantity() {
+        // given
+        UUID productId = UUID.randomUUID();
+        Stock stock = createStock(productId, 100);
+        // when
+        stock.validatePositiveAmount(50);
+        // then
+        assertThat(stock.getQuantity()).isEqualTo(100);
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {0, -1, -10})
     @DisplayName("재고 감소할 때 '감소 값 <= 0'일 경우 예외 반환")
@@ -99,7 +113,7 @@ class StockTest {
         );
         // then
         assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.STOCK_VALID);
-        assertThat(businessException.getMessage()).contains("감소 수량은 0보다 커야 합니다.");
+        assertThat(businessException.getMessage()).contains("재고 변경 수량은 0보다 커야 합니다.");
     }
 
     @ParameterizedTest
@@ -119,13 +133,14 @@ class StockTest {
     }
 
     @Test
-    @DisplayName("같은 상품에 대한 재고인지 확인할 수 있다.")
-    public void isSameProduct() {
+    @DisplayName("같은 허브 상품에 대한 재고인지 확인할 수 있다.")
+    public void isSameHubProduct() {
         // given
+        UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        Stock stock = createStock(productId, 100);
+        Stock stock = Stock.of(hubId, productId, 100);
         // when
-        boolean isSameProduct = stock.isSameProduct(stock.getProductId());
+        boolean isSameProduct = stock.isSameHubProduct(stock.getHubId(), stock.getProductId());
         // then
         assertThat(isSameProduct).isTrue();
     }
@@ -170,7 +185,7 @@ class StockTest {
         );
         // then
         assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.STOCK_VALID);
-        assertThat(businessException.getMessage()).contains("증가 수량은 0보다 커야 합니다.");
+        assertThat(businessException.getMessage()).contains("재고 변경 수량은 0보다 커야 합니다.");
     }
 
     @Test
@@ -188,10 +203,12 @@ class StockTest {
     @Test
     @DisplayName("재고 0으로 생성 가능")
     public void of_quantityIsZero_success() {
-        //given
+        // given
         UUID productId = UUID.randomUUID();
+
         // when
         Stock stock = createStock(productId, 0);
+
         // then
         assertThat(stock.getQuantity()).isEqualTo(0);
     }

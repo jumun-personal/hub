@@ -2,7 +2,7 @@ package com.jumunhasyeo.stock.presentation;
 
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.stock.application.dto.response.StockRes;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
 import com.jumunhasyeo.stock.presentation.dto.request.DecreaseStockReq;
 import com.jumunhasyeo.stock.presentation.dto.request.IncrementStockReq;
 import com.jumunhasyeo.testsupport.ControllerSliceTest;
@@ -26,19 +26,14 @@ class StockInternalWebControllerTest extends ControllerSliceTest {
     void decrement_stock_success() throws Exception {
         // given
         UUID productId = UUID.randomUUID();
-        UUID stockId = UUID.randomUUID();
+        UUID hubId = UUID.randomUUID();
         ArrayList<DecreaseStockReq> reqs = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            reqs.add(new DecreaseStockReq(stockId, 100));
+            reqs.add(new DecreaseStockReq(hubId, productId, 100));
         }
-        StockRes stockRes = StockRes.builder()
-                .stockId(stockId)
-                .hubId(UUID.randomUUID())
-                .productId(productId)
-                .quantity(200)
-                .build();
+        StockChangeRes stockChangeRes = StockChangeRes.decrease(hubId, productId, 100);
 
-        given(stockService.decrement(any(), any())).willReturn(List.of(stockRes));
+        given(stockService.decrement(any(), any())).willReturn(List.of(stockChangeRes));
 
         // when & then
         mockMvc.perform(post("/internal/api/v1/stocks/decrement")
@@ -46,7 +41,10 @@ class StockInternalWebControllerTest extends ControllerSliceTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reqs)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("true"))
+                .andExpect(jsonPath("$.data[0].hubId").value(hubId.toString()))
+                .andExpect(jsonPath("$.data[0].productId").value(productId.toString()))
+                .andExpect(jsonPath("$.data[0].type").value("DECREASE"))
+                .andExpect(jsonPath("$.data[0].quantity").value(100))
                 .andReturn();
     }
 
@@ -55,19 +53,14 @@ class StockInternalWebControllerTest extends ControllerSliceTest {
     void increment_stock_success() throws Exception {
         // given
         UUID productId = UUID.randomUUID();
-        UUID stockId = UUID.randomUUID();
+        UUID hubId = UUID.randomUUID();
         ArrayList<IncrementStockReq> request = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            request.add(new IncrementStockReq(stockId, 100));
+            request.add(new IncrementStockReq(hubId, productId, 100));
         }
-        StockRes stockRes = StockRes.builder()
-                .stockId(stockId)
-                .hubId(UUID.randomUUID())
-                .productId(productId)
-                .quantity(200)
-                .build();
+        StockChangeRes stockChangeRes = StockChangeRes.increase(hubId, productId, 100);
 
-        given(stockService.increment(any(), any())).willReturn(List.of(stockRes));
+        given(stockService.increment(any(), any())).willReturn(List.of(stockChangeRes));
 
         // when & then
         mockMvc.perform(post("/internal/api/v1/stocks/increment")
@@ -75,7 +68,10 @@ class StockInternalWebControllerTest extends ControllerSliceTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("true"))
+                .andExpect(jsonPath("$.data[0].hubId").value(hubId.toString()))
+                .andExpect(jsonPath("$.data[0].productId").value(productId.toString()))
+                .andExpect(jsonPath("$.data[0].type").value("INCREASE"))
+                .andExpect(jsonPath("$.data[0].quantity").value(100))
                 .andReturn();
     }
 
@@ -83,7 +79,7 @@ class StockInternalWebControllerTest extends ControllerSliceTest {
     @DisplayName("재고 증가 중복 성공 충돌은 기존처럼 409를 반환한다.")
     void increment_stock_whenSuccessConflict_returns409() throws Exception {
         ArrayList<IncrementStockReq> request = new ArrayList<>();
-        request.add(new IncrementStockReq(UUID.randomUUID(), 100));
+        request.add(new IncrementStockReq(UUID.randomUUID(), UUID.randomUUID(), 100));
         given(stockService.increment(any(), any()))
                 .willThrow(new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION));
 

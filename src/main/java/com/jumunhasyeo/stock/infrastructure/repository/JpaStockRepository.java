@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,35 +19,39 @@ public interface JpaStockRepository extends JpaRepository<Stock, UUID> {
     Optional<Stock> findById(@Param("id") UUID id);
 
     @Query("SELECT s FROM Stock s " +
-            "WHERE s.productId = :productId " +
+            "WHERE s.hubId = :hubId " +
+            "AND s.productId = :productId " +
             "AND s.isDeleted = false")
-    List<Stock> findByProductId(UUID productId);
+    Optional<Stock> findByHubIdAndProductId(@Param("hubId") UUID hubId, @Param("productId") UUID productId);
 
     @Modifying
-    @Transactional
     @Query("""
             UPDATE Stock s
             SET s.quantity = s.quantity - :amount
-            WHERE s.stockId = :stockId
+            WHERE s.hubId = :hubId
+              AND s.productId = :productId
+              AND s.isDeleted = false
               AND s.quantity >= :amount
             """)
-    int decreaseStock(@Param("stockId") UUID stockId, @Param("amount") int amount);
+    int decreaseStock(@Param("hubId") UUID hubId, @Param("productId") UUID productId, @Param("amount") int amount);
 
     @Modifying
-    @Transactional
     @Query("""
             UPDATE Stock s
             SET s.quantity = s.quantity + :amount
-            WHERE s.stockId = :stockId
+            WHERE s.hubId = :hubId
+              AND s.productId = :productId
+              AND s.isDeleted = false
               AND s.quantity <= 2147483647 - :amount
             """)
-    int increaseStock(@Param("stockId") UUID stockId, @Param("amount") int amount);
+    int increaseStock(@Param("hubId") UUID hubId, @Param("productId") UUID productId, @Param("amount") int amount);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Stock s " +
-            "WHERE s.productId = :productId " +
+            "WHERE s.hubId = :hubId " +
+            "AND s.productId = :productId " +
             "AND s.isDeleted = false")
-    Optional<Stock> findStockByProductIdWithLock(UUID productId);
+    Optional<Stock> findStockByHubIdAndProductIdWithLock(@Param("hubId") UUID hubId, @Param("productId") UUID productId);
 
     @Query("""
         SELECT s FROM Stock s 

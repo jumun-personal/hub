@@ -10,23 +10,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StockCommandTest {
 
     @Test
-    @DisplayName("DecreaseStockCommand 필드 접근")
+    @DisplayName("재고 감소 명령은 허브와 상품 및 감소 수량을 보존한다")
     void decreaseStockCommand_fields() {
+        // given
+        UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
 
-        DecreaseStockCommand command = new DecreaseStockCommand(productId, 10);
+        // when
+        DecreaseStockCommand command = new DecreaseStockCommand(hubId, productId, 10);
 
+        // then
+        assertThat(command.hubId()).isEqualTo(hubId);
         assertThat(command.productId()).isEqualTo(productId);
         assertThat(command.amount()).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("IncreaseStockCommand 필드 접근")
+    @DisplayName("재고 증가 명령은 허브와 상품 및 증가 수량을 보존한다")
     void increaseStockCommand_fields() {
+        // given
+        UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
 
-        IncreaseStockCommand command = new IncreaseStockCommand(productId, 4);
+        // when
+        IncreaseStockCommand command = new IncreaseStockCommand(hubId, productId, 4);
 
+        // then
+        assertThat(command.hubId()).isEqualTo(hubId);
         assertThat(command.productId()).isEqualTo(productId);
         assertThat(command.amount()).isEqualTo(4);
     }

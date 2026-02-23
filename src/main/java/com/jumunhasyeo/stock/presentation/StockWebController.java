@@ -6,6 +6,7 @@ import com.jumunhasyeo.stock.application.command.CreateStockCommand;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.DeleteStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
 import com.jumunhasyeo.stock.application.dto.response.StockRes;
 import com.jumunhasyeo.stock.presentation.docs.ApiDocDeleteStock;
 import com.jumunhasyeo.stock.presentation.docs.ApiDocGetStock;
@@ -53,35 +54,35 @@ public class StockWebController {
     }
 
     @PostMapping("/increment")
-    public ResponseEntity<ApiRes<Boolean>> increment(
+    public ResponseEntity<ApiRes<List<StockChangeRes>>> increment(
             @Parameter(description = "멱등키 (중복 요청 방지)", required = true, example = "550e8400-e29b-41d4-a716-446655440000")
             @RequestHeader(value = "Idempotency-Key") String idempotencyKey,
             @Parameter(description = "재고 증가 요청 정보", required = true)
-            @RequestBody @Valid List<IncrementStockReq> productList
+            @RequestBody @Valid List<@Valid IncrementStockReq> productList
     ) {
         List<IncreaseStockCommand> commandList = productList
                 .stream()
-                .map(incrStockReq -> new IncreaseStockCommand(incrStockReq.productId(), incrStockReq.quantity()))
+                .map(incrStockReq -> new IncreaseStockCommand(incrStockReq.hubId(), incrStockReq.productId(), incrStockReq.quantity()))
                 .toList();
 
-        List<StockRes> stockResList = stockService.increment(idempotencyKey, commandList);
-        return ResponseEntity.ok(ApiRes.success(true));
+        List<StockChangeRes> stockChangeResList = stockService.increment(idempotencyKey, commandList);
+        return ResponseEntity.ok(ApiRes.success(stockChangeResList));
     }
 
     @PostMapping("/decrement")
-    public ResponseEntity<ApiRes<Boolean>> decrement(
+    public ResponseEntity<ApiRes<List<StockChangeRes>>> decrement(
             @Parameter(description = "멱등키 (중복 요청 방지)", required = true, example = "550e8400-e29b-41d4-a716-446655440000")
             @RequestHeader(value = "Idempotency-Key") String idempotencyKey,
             @Parameter(description = "재고 감소 요청 정보", required = true)
-            @RequestBody @Valid List<DecreaseStockReq> productList
+            @RequestBody @Valid List<@Valid DecreaseStockReq> productList
     ) {
         List<DecreaseStockCommand> commandList = productList
                 .stream()
-                .map(descStockReq -> new DecreaseStockCommand(descStockReq.productId(), descStockReq.quantity()))
+                .map(descStockReq -> new DecreaseStockCommand(descStockReq.hubId(), descStockReq.productId(), descStockReq.quantity()))
                 .toList();
 
-        List<StockRes> stockRes = stockService.decrement(idempotencyKey, commandList);
-        return ResponseEntity.ok(ApiRes.success(true));
+        List<StockChangeRes> stockChangeResList = stockService.decrement(idempotencyKey, commandList);
+        return ResponseEntity.ok(ApiRes.success(stockChangeResList));
     }
 
     //재고 삭제 (TODO: HUB_MANAGER/MASTER, SYSTEM)

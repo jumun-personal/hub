@@ -14,8 +14,8 @@ import java.util.UUID;
         name = "p_stock_history",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_stock_history_idempotency_product_type",
-                        columnNames = {"idempotency_key", "product_id", "type"}
+                        name = "uk_stock_history_idempotency_hub_product_type",
+                        columnNames = {"idempotency_key", "hub_id", "product_id", "type"}
                 )
         }
 )

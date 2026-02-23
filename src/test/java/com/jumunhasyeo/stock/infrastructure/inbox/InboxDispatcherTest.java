@@ -42,13 +42,13 @@ class InboxDispatcherTest {
     }
 
     @Test
-    @DisplayName("이미 처리 중인 중복 보상 재처리는 예외 없이 no-op 처리한다")
-    void dispatch_whenProcessingConflict_ignoreDuplicate() {
+    @DisplayName("이미 성공한 중복 보상 재처리는 예외 없이 no-op 처리한다")
+    void dispatch_whenSuccessConflict_ignoreDuplicate() {
         InboxEvent event = inboxEvent("event-key");
         StockHistory history = StockHistory.ofDecrease(UUID.randomUUID(), UUID.randomUUID(), 3, event.getEventKey());
         given(stockHistoryRepository.findByIdempotencyKeyAndType(event.getEventKey(), DECREASE)).willReturn(List.of(history));
         given(stockService.increment(eq("CANCEL_" + event.getEventKey()), any()))
-                .willThrow(new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION));
+                .willThrow(new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION));
 
         assertThatCode(() -> inboxDispatcher.dispatch(event))
                 .doesNotThrowAnyException();

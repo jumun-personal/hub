@@ -10,13 +10,13 @@ import java.util.UUID;
 
 public interface StockRepository {
 
-    Optional<Stock> findByProductId(UUID productId);
+    Optional<Stock> findByHubIdAndProductId(UUID hubId, UUID productId);
 
-    Optional<Stock> findByProductIdWithLock(UUID productId);
+    Optional<Stock> findByHubIdAndProductIdWithLock(UUID hubId, UUID productId);
 
-    boolean decreaseStock(UUID stockId, int quantity);
+    boolean decreaseStock(UUID hubId, UUID productId, int quantity);
 
-    boolean increaseStock(UUID stockId, int amount);
+    boolean increaseStock(UUID hubId, UUID productId, int amount);
 
     Optional<Stock> findById(UUID stockId);
 

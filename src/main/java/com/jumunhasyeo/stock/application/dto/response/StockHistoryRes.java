@@ -10,7 +10,7 @@ import java.util.UUID;
 public record StockHistoryRes(
         @Schema(description = "이력 ID")
         UUID id,
-        
+
         @Schema(description = "허브 ID")
         UUID hubId,
         

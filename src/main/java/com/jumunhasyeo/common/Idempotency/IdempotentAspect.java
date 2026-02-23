@@ -9,6 +9,8 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 
@@ -48,9 +50,9 @@ public class IdempotentAspect {
 
         try {
             Object result = joinPoint.proceed();
-            markSuccess(statusKey, successTtl);
+            markSuccessAfterCommit(statusKey, successTtl);
             return result;
-        } catch (Exception e) { // 5. 실패 → FAILED + 에러 저장 (재시도 가능)
+        } catch (Exception e) {
             fail(e, statusKey);
             throw e;
         }
@@ -63,11 +65,32 @@ public class IdempotentAspect {
         return rawKey;
     }
 
+    private void markSuccessAfterCommit(String statusKey, Duration successTtl) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            markSuccess(statusKey, successTtl);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                markSuccess(statusKey, successTtl);
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    stringRedisTemplate.delete(statusKey);
+                }
+            }
+        });
+    }
+
     private void markSuccess(String statusKey, Duration successTtl) {
         try {
             stringRedisTemplate.opsForValue()
                     .set(statusKey, IdempotentStatus.SUCCESS.name(), successTtl);
-            log.info("Successfully completed and cached result for key: {}", statusKey);
+            log.info("Successfully completed and marked idempotency key as SUCCESS. key={}", statusKey);
         } catch (RuntimeException e) {
             log.error("Business logic succeeded but failed to mark idempotency key as SUCCESS. key={}", statusKey, e);
         }

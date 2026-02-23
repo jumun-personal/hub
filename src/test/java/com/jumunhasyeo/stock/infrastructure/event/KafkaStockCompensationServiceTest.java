@@ -30,7 +30,7 @@ class KafkaStockCompensationServiceTest {
     @Test
     @DisplayName("이미 성공한 중복 보상은 no-op로 흡수한다")
     void incrementCompensation_whenSuccessConflict_ignore() {
-        List<IncreaseStockCommand> commands = List.of(new IncreaseStockCommand(UUID.randomUUID(), 3));
+        List<IncreaseStockCommand> commands = List.of(new IncreaseStockCommand(UUID.randomUUID(), UUID.randomUUID(), 3));
         given(stockService.increment("cancel-key", commands))
                 .willThrow(new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION));
 
@@ -41,7 +41,7 @@ class KafkaStockCompensationServiceTest {
     @Test
     @DisplayName("PROCESSING 충돌은 그대로 전파한다")
     void incrementCompensation_whenProcessingConflict_propagate() {
-        List<IncreaseStockCommand> commands = List.of(new IncreaseStockCommand(UUID.randomUUID(), 3));
+        List<IncreaseStockCommand> commands = List.of(new IncreaseStockCommand(UUID.randomUUID(), UUID.randomUUID(), 3));
         given(stockService.increment("cancel-key", commands))
                 .willThrow(new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION));
 
