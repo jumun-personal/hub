@@ -41,15 +41,18 @@ public class JpaStockRepositoryConcurrencyTest extends IntegrationTest {
         int initQuantity = willSuccessCount;
         int decreaseRequestCount = 10;
         UUID stockId = transactionTemplate.execute(status -> stockSave(productId, initQuantity));
+        UUID hubId = jpaStockRepository.findById(stockId).orElseThrow().getHubId();
         //when
 
         int successCount = executeConcurrently(
                 decreaseRequestCount,
-                () -> (jpaStockRepository.decreaseStock(stockId, 1) == 1)
+                () -> transactionTemplate.execute(
+                        status -> jpaStockRepository.decreaseStock(hubId, productId, 1) == 1
+                )
         );
 
         //then
-        Stock stock = jpaStockRepository.findByProductId(productId).get(0);
+        Stock stock = jpaStockRepository.findById(stockId).orElseThrow();
         assertThat(successCount).isEqualTo(willSuccessCount);
         assertThat(stock.getQuantity()).isEqualTo(initQuantity - successCount);
     }
@@ -64,15 +67,18 @@ public class JpaStockRepositoryConcurrencyTest extends IntegrationTest {
         int initQuantity = stockMax - willSuccessCount;
         int increaseRequestCount = 10;
         UUID stockId = transactionTemplate.execute(status -> stockSave(productId, initQuantity));
+        UUID hubId = jpaStockRepository.findById(stockId).orElseThrow().getHubId();
 
         //when
         int successCount = executeConcurrently(
                 increaseRequestCount,
-                () -> (jpaStockRepository.increaseStock(stockId, 1) == 1)
+                () -> transactionTemplate.execute(
+                        status -> jpaStockRepository.increaseStock(hubId, productId, 1) == 1
+                )
         );
 
         //then
-        Stock stock = jpaStockRepository.findByProductId(productId).get(0);
+        Stock stock = jpaStockRepository.findById(stockId).orElseThrow();
         assertThat(successCount).isEqualTo(willSuccessCount);
         assertThat(stock.getQuantity()).isEqualTo(initQuantity + successCount);
     }

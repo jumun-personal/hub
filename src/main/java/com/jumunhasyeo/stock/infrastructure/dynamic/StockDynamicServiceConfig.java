@@ -4,7 +4,6 @@ import com.jumunhasyeo.stock.application.StockVariationServiceImpl;
 import com.jumunhasyeo.stock.application.StockVariationServicePessimisticLock;
 import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
-import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,11 +19,10 @@ public class StockDynamicServiceConfig {
     @Qualifier("stockVariationStrategy")
     public StockVariationServiceImpl stockVariationServiceImpl(
             StockRepository stockRepository,
-            StockHistoryRepository stockHistoryRepository,
-            EntityManager entityManager
+            StockHistoryRepository stockHistoryRepository
     ) {
         log.info("[Dynamic] Creating StockVariationServiceImpl");
-        return new StockVariationServiceImpl(stockRepository, stockHistoryRepository, entityManager);
+        return new StockVariationServiceImpl(stockRepository, stockHistoryRepository);
     }
 
     @Bean

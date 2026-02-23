@@ -93,7 +93,9 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
 
     private Measurement measure(StockStrategy strategy) throws InterruptedException {
         UUID productId = UUID.randomUUID();
-        UUID stockId = transactionTemplate.execute(status -> stockSave(productId, INITIAL_QUANTITY));
+        StockSeed stockSeed = transactionTemplate.execute(status -> stockSave(productId, INITIAL_QUANTITY));
+        UUID hubId = stockSeed.hubId();
+        UUID stockId = stockSeed.stockId();
         HikariSampler hikariSampler = new HikariSampler(dataSource.getHikariPoolMXBean());
         DbActivitySampler dbActivitySampler = new DbActivitySampler(dataSource, strategy.applicationName());
 
@@ -116,7 +118,7 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
                 try {
                     start.await();
                     long requestStartedAt = System.nanoTime();
-                    OperationResult result = strategy.decrease(jpaStockRepository, transactionTemplate, entityManager, productId, stockId);
+                    OperationResult result = strategy.decrease(jpaStockRepository, transactionTemplate, entityManager, hubId, productId, stockId);
                     latencies.add(System.nanoTime() - requestStartedAt);
                     dbWorkDurations.add(result.dbWorkNanos());
                     if (result.success()) {
@@ -186,7 +188,7 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
                 .get(measurements.size() / 2);
     }
 
-    private UUID stockSave(UUID productId, int initQuantity) {
+    private StockSeed stockSave(UUID productId, int initQuantity) {
         Hub hub = Hub.builder()
                 .name("허브-" + productId.toString().substring(0, 8))
                 .status(HubStatus.COMPLETE)
@@ -198,7 +200,7 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
         Stock stock = Stock.of(hub.getHubId(), productId, initQuantity);
         entityManager.persist(stock);
         entityManager.flush();
-        return stock.getStockId();
+        return new StockSeed(hub.getHubId(), stock.getStockId());
     }
 
     private enum StockStrategy {
@@ -208,13 +210,14 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
                     JpaStockRepository repository,
                     TransactionTemplate transactionTemplate,
                     EntityManager entityManager,
+                    UUID hubId,
                     UUID productId,
                     UUID stockId
             ) {
                 return transactionTemplate.execute(status -> {
                     markTransaction(entityManager);
                     long dbStartedAt = System.nanoTime();
-                    Stock stock = repository.findStockByProductIdWithLock(productId).orElseThrow();
+                    Stock stock = repository.findStockByHubIdAndProductIdWithLock(hubId, productId).orElseThrow();
                     try {
                         stock.decrease(1);
                         return new OperationResult(true, System.nanoTime() - dbStartedAt);
@@ -230,13 +233,14 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
                     JpaStockRepository repository,
                     TransactionTemplate transactionTemplate,
                     EntityManager entityManager,
+                    UUID hubId,
                     UUID productId,
                     UUID stockId
             ) {
                 return transactionTemplate.execute(status -> {
                     markTransaction(entityManager);
                     long dbStartedAt = System.nanoTime();
-                    boolean success = repository.decreaseStock(stockId, 1) == 1;
+                    boolean success = repository.decreaseStock(hubId, productId, 1) == 1;
                     return new OperationResult(success, System.nanoTime() - dbStartedAt);
                 });
             }
@@ -246,6 +250,7 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
                 JpaStockRepository repository,
                 TransactionTemplate transactionTemplate,
                 EntityManager entityManager,
+                UUID hubId,
                 UUID productId,
                 UUID stockId
         );
@@ -263,6 +268,12 @@ class StockLockStrategyMeasurementTest extends IntegrationTest {
     private record OperationResult(
             boolean success,
             long dbWorkNanos
+    ) {
+    }
+
+    private record StockSeed(
+            UUID hubId,
+            UUID stockId
     ) {
     }
 

@@ -70,7 +70,9 @@ class StockSqlLockStrategyMeasurementTest {
             statement.execute("""
                     create table if not exists p_stock_sql_measurement (
                         stock_id uuid primary key,
-                        product_id uuid not null unique,
+                        hub_id uuid not null,
+                        product_id uuid not null,
+                        constraint uk_stock_hub_product unique (hub_id, product_id),
                         quantity integer not null,
                         is_deleted boolean not null default false
                     )
@@ -126,8 +128,9 @@ class StockSqlLockStrategyMeasurementTest {
 
     private Measurement measure(SqlStrategy strategy) throws Exception {
         UUID stockId = UUID.randomUUID();
+        UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        resetStock(stockId, productId);
+        resetStock(stockId, hubId, productId);
 
         HikariSampler hikariSampler = new HikariSampler(dataSource.getHikariPoolMXBean());
         PgActivitySampler pgActivitySampler = new PgActivitySampler(strategy.applicationName());
@@ -150,7 +153,7 @@ class StockSqlLockStrategyMeasurementTest {
                 try {
                     start.await();
                     long responseStartedAt = System.nanoTime();
-                    OperationResult result = strategy.decrease(dataSource, productId, stockId);
+                    OperationResult result = strategy.decrease(dataSource, hubId, productId, stockId);
                     responseDurations.add(System.nanoTime() - responseStartedAt);
                     dbWorkDurations.add(result.dbWorkNanos());
                     if (result.success()) {
@@ -192,17 +195,18 @@ class StockSqlLockStrategyMeasurementTest {
         );
     }
 
-    private void resetStock(UUID stockId, UUID productId) throws SQLException {
+    private void resetStock(UUID stockId, UUID hubId, UUID productId) throws SQLException {
         try (Connection connection = dataSource.getConnection();
              Statement truncate = connection.createStatement();
              PreparedStatement insert = connection.prepareStatement("""
-                     insert into p_stock_sql_measurement(stock_id, product_id, quantity, is_deleted)
-                     values (?, ?, ?, false)
+                     insert into p_stock_sql_measurement(stock_id, hub_id, product_id, quantity, is_deleted)
+                     values (?, ?, ?, ?, false)
                      """)) {
             truncate.execute("truncate table p_stock_sql_measurement");
             insert.setObject(1, stockId);
-            insert.setObject(2, productId);
-            insert.setInt(3, INITIAL_QUANTITY);
+            insert.setObject(2, hubId);
+            insert.setObject(3, productId);
+            insert.setInt(4, INITIAL_QUANTITY);
             insert.executeUpdate();
         }
     }
@@ -232,7 +236,7 @@ class StockSqlLockStrategyMeasurementTest {
     private enum SqlStrategy {
         SELECT_FOR_UPDATE {
             @Override
-            OperationResult decrease(HikariDataSource dataSource, UUID productId, UUID stockId) throws SQLException {
+            OperationResult decrease(HikariDataSource dataSource, UUID hubId, UUID productId, UUID stockId) throws SQLException {
                 try (Connection connection = dataSource.getConnection()) {
                     connection.setAutoCommit(false);
                     markTransaction(connection);
@@ -240,7 +244,8 @@ class StockSqlLockStrategyMeasurementTest {
                     try (PreparedStatement select = connection.prepareStatement("""
                                  select stock_id, quantity
                                  from p_stock_sql_measurement
-                                 where product_id = ?
+                                 where hub_id = ?
+                                   and product_id = ?
                                    and is_deleted = false
                                  for update
                              """);
@@ -249,7 +254,8 @@ class StockSqlLockStrategyMeasurementTest {
                                  set quantity = quantity - 1
                                  where stock_id = ?
                              """)) {
-                        select.setObject(1, productId);
+                        select.setObject(1, hubId);
+                        select.setObject(2, productId);
                         try (ResultSet resultSet = select.executeQuery()) {
                             if (!resultSet.next() || resultSet.getInt("quantity") <= 0) {
                                 connection.commit();
@@ -269,7 +275,7 @@ class StockSqlLockStrategyMeasurementTest {
         },
         CONDITIONAL_UPDATE {
             @Override
-            OperationResult decrease(HikariDataSource dataSource, UUID productId, UUID stockId) throws SQLException {
+            OperationResult decrease(HikariDataSource dataSource, UUID hubId, UUID productId, UUID stockId) throws SQLException {
                 try (Connection connection = dataSource.getConnection()) {
                     connection.setAutoCommit(false);
                     markTransaction(connection);
@@ -292,7 +298,7 @@ class StockSqlLockStrategyMeasurementTest {
             }
         };
 
-        abstract OperationResult decrease(HikariDataSource dataSource, UUID productId, UUID stockId) throws SQLException;
+        abstract OperationResult decrease(HikariDataSource dataSource, UUID hubId, UUID productId, UUID stockId) throws SQLException;
 
         String applicationName() {
             return "stock-sql-" + name();

@@ -81,14 +81,14 @@ class OrderCompensateHandlerTest {
     }
 
     @Test
-    @DisplayName("보상 increment가 이미 처리 중이거나 성공한 중복이면 예외 없이 no-op 처리한다")
+    @DisplayName("보상 increment가 이미 성공한 중복이면 예외 없이 no-op 처리한다")
     void compensate_whenConflict_ignoreDuplicate() throws Exception {
         OrderCancelEvent event = new OrderCancelEvent(UUID.randomUUID(), "", LocalDateTime.now());
         UUID productId = UUID.randomUUID();
         StockHistory history = StockHistory.ofDecrease(UUID.randomUUID(), productId, 3, event.getKey());
         given(stockHistoryRepository.findByIdempotencyKeyAndType(event.getKey(), DECREASE)).willReturn(List.of(history));
         given(stockService.increment(eq("CANCEL_" + event.getKey()), any()))
-                .willThrow(new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION));
+                .willThrow(new BusinessException(ErrorCode.SUCCESS_CONFLICT_EXCEPTION));
 
         assertThatCode(() -> orderCompensateHandler.compensate(event))
                 .doesNotThrowAnyException();

@@ -6,8 +6,9 @@ import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
-import com.jumunhasyeo.stock.application.dto.response.StockRes;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
 import com.jumunhasyeo.stock.domain.entity.Stock;
+import com.jumunhasyeo.stock.domain.entity.StockHistory;
 import com.jumunhasyeo.testsupport.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,14 +38,14 @@ public class StockVariationServiceImplIntegrationTest extends IntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     @Test
-    @DisplayName("decreaseStock() 실행시 변경 감지를 차단해 중복 쿼리가 발생되지 않는다.")
+    @DisplayName("decrement()는 조건부 UPDATE와 이력 INSERT를 각각 한 번 실행한다.")
     public void decreaseStock_실행시_변경_감지를_차단해_중복_쿼리가_발생되지_않는다() {
         //given
         UUID productId = UUID.randomUUID();
         Stock stock = transactionTemplate.execute(status -> {
             return createSaveStock(productId, 500);
         });
-        DecreaseStockCommand command = new DecreaseStockCommand(stock.getProductId(), 100);
+        DecreaseStockCommand command = new DecreaseStockCommand(stock.getHubId(), stock.getProductId(), 100);
 
         // 쿼리 발생 횟수 검증을 위한 Hibernate Statistics 초기화
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class)
@@ -52,26 +54,26 @@ public class StockVariationServiceImplIntegrationTest extends IntegrationTest {
         statistics.clear();
 
         //when
-        StockRes stockRes = transactionTemplate.execute(status -> stockService.decrement(command));
+        StockChangeRes stockChangeRes = transactionTemplate.execute(status -> stockService.decrement("idem-decrease", List.of(command)).get(0));
         //then
-        assertThat(stockRes.stockId()).isEqualTo(stock.getStockId());
-        assertThat(stockRes.quantity()).isEqualTo(400);
-        assertThat(stockRes.hubId()).isEqualTo(stock.getHubId());
-        assertThat(stockRes.productId()).isEqualTo(stock.getProductId());
-        assertThat(statistics.getQueryExecutionCount()) //  UPDATE 쿼리가 1번만 발생했는지 검증
-                .as("UPDATE 쿼리는 1번만 발생해야 합니다")
-                .isEqualTo(1);
+        assertThat(stockChangeRes.quantity()).isEqualTo(100);
+        assertThat(stockChangeRes.type()).isEqualTo(StockHistory.StockHistoryType.DECREASE);
+        assertThat(stockChangeRes.hubId()).isEqualTo(stock.getHubId());
+        assertThat(stockChangeRes.productId()).isEqualTo(stock.getProductId());
+        assertThat(statistics.getPrepareStatementCount())
+                .as("조건부 UPDATE와 재고 이력 INSERT만 실행해야 합니다")
+                .isEqualTo(2);
     }
 
     @Test
-    @DisplayName("increaseStock() 실행시 변경 감지를 차단해 중복 쿼리가 발생되지 않는다.")
+    @DisplayName("increment()는 조건부 UPDATE와 이력 INSERT를 각각 한 번 실행한다.")
     public void increaseStock_실행시_변경_감지를_차단해_중복_쿼리가_발생되지_않는다() {
         //given
         UUID productId = UUID.randomUUID();
         Stock stock = transactionTemplate.execute(status -> {
             return createSaveStock(productId, 500);
         });
-        IncreaseStockCommand command = new IncreaseStockCommand(stock.getProductId(), 100);
+        IncreaseStockCommand command = new IncreaseStockCommand(stock.getHubId(), stock.getProductId(), 100);
 
         // 쿼리 발생 횟수 검증을 위한 Hibernate Statistics 초기화
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class)
@@ -80,15 +82,15 @@ public class StockVariationServiceImplIntegrationTest extends IntegrationTest {
         statistics.clear();
 
         //when
-        StockRes stockRes = transactionTemplate.execute(status -> stockService.increment(command));
+        StockChangeRes stockChangeRes = transactionTemplate.execute(status -> stockService.increment("idem-increase", List.of(command)).get(0));
         //then
-        assertThat(stockRes.stockId()).isEqualTo(stock.getStockId());
-        assertThat(stockRes.quantity()).isEqualTo(600);
-        assertThat(stockRes.hubId()).isEqualTo(stock.getHubId());
-        assertThat(stockRes.productId()).isEqualTo(stock.getProductId());
-        assertThat(statistics.getQueryExecutionCount()) //  UPDATE 쿼리가 1번만 발생했는지 검증
-                .as("UPDATE 쿼리는 1번만 발생해야 합니다")
-                .isEqualTo(1);
+        assertThat(stockChangeRes.quantity()).isEqualTo(100);
+        assertThat(stockChangeRes.type()).isEqualTo(StockHistory.StockHistoryType.INCREASE);
+        assertThat(stockChangeRes.hubId()).isEqualTo(stock.getHubId());
+        assertThat(stockChangeRes.productId()).isEqualTo(stock.getProductId());
+        assertThat(statistics.getPrepareStatementCount())
+                .as("조건부 UPDATE와 재고 이력 INSERT만 실행해야 합니다")
+                .isEqualTo(2);
     }
 
     private Stock createSaveStock(UUID productId, int quantity) {

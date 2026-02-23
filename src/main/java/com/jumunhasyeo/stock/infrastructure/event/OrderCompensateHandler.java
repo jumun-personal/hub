@@ -33,7 +33,7 @@ public class OrderCompensateHandler {
         }
 
         List<IncreaseStockCommand> payload = histories.stream()
-                .map(history -> new IncreaseStockCommand(history.getProductId(), history.getQuantity()))
+                .map(history -> new IncreaseStockCommand(history.getHubId(), history.getProductId(), history.getQuantity()))
                 .toList();
         kafkaStockCompensationService.incrementCompensation(cancelKey(event.getKey()), payload);
     }

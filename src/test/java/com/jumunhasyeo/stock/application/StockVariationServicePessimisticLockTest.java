@@ -5,7 +5,8 @@ import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
-import com.jumunhasyeo.stock.application.dto.response.StockRes;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
+import com.jumunhasyeo.stock.domain.entity.StockHistory;
 import com.jumunhasyeo.stock.domain.entity.Stock;
 import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,13 +47,15 @@ class StockVariationServicePessimisticLockTest {
     void decrement_success() {
         UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        Stock stock = Stock.of(hubId, productId, 30);
-        when(stockRepository.findByProductIdWithLock(productId)).thenReturn(Optional.of(stock));
+        Stock stock = createStock(hubId, productId, 30);
+        when(stockRepository.findByHubIdAndProductIdWithLock(hubId, productId)).thenReturn(Optional.of(stock));
 
-        StockRes result = service.decrement(new DecreaseStockCommand(productId, 7));
+        StockChangeRes result = service.decrement("idem-decrease", List.of(new DecreaseStockCommand(hubId, productId, 7))).get(0);
 
+        assertThat(result.hubId()).isEqualTo(hubId);
         assertThat(result.productId()).isEqualTo(productId);
-        assertThat(result.quantity()).isEqualTo(23);
+        assertThat(result.type()).isEqualTo(StockHistory.StockHistoryType.DECREASE);
+        assertThat(result.quantity()).isEqualTo(7);
     }
 
     @Test
@@ -59,23 +63,35 @@ class StockVariationServicePessimisticLockTest {
     void increment_success() {
         UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        Stock stock = Stock.of(hubId, productId, 30);
-        when(stockRepository.findByProductIdWithLock(productId)).thenReturn(Optional.of(stock));
+        Stock stock = createStock(hubId, productId, 30);
+        when(stockRepository.findByHubIdAndProductIdWithLock(hubId, productId)).thenReturn(Optional.of(stock));
 
-        StockRes result = service.increment(new IncreaseStockCommand(productId, 7));
+        StockChangeRes result = service.increment("idem-increase", List.of(new IncreaseStockCommand(hubId, productId, 7))).get(0);
 
+        assertThat(result.hubId()).isEqualTo(hubId);
         assertThat(result.productId()).isEqualTo(productId);
-        assertThat(result.quantity()).isEqualTo(37);
+        assertThat(result.type()).isEqualTo(StockHistory.StockHistoryType.INCREASE);
+        assertThat(result.quantity()).isEqualTo(7);
     }
 
     @Test
     @DisplayName("비관적 락 조회에 실패하면 NOT_FOUND_EXCEPTION 예외를 던진다.")
     void get_by_lock_not_found() {
+        UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
-        when(stockRepository.findByProductIdWithLock(productId)).thenReturn(Optional.empty());
+        when(stockRepository.findByHubIdAndProductIdWithLock(hubId, productId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.decrement(new DecreaseStockCommand(productId, 1)))
+        assertThatThrownBy(() -> service.decrement("idem-not-found", List.of(new DecreaseStockCommand(hubId, productId, 1))))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_EXCEPTION);
+    }
+
+    private Stock createStock(UUID hubId, UUID productId, int quantity) {
+        return Stock.builder()
+                .stockId(UUID.randomUUID())
+                .hubId(hubId)
+                .productId(productId)
+                .quantity(quantity)
+                .build();
     }
 }

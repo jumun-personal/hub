@@ -9,7 +9,15 @@ import lombok.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "p_stock")
+@Table(
+        name = "p_stock",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_stock_hub_product",
+                        columnNames = {"hub_id", "product_id"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -21,7 +29,7 @@ public class Stock extends BaseEntity {
     @Column(name = "stock_id", columnDefinition = "UUID")
     private UUID stockId;
 
-    @Column(name = "product_id", columnDefinition = "UUID", unique = true)
+    @Column(name = "product_id", columnDefinition = "UUID", nullable = false)
     private UUID productId;
 
     @Column(name = "quantity", nullable = false)
@@ -43,28 +51,37 @@ public class Stock extends BaseEntity {
     }
 
     public void decrease(int amount) {
-        if (amount <= 0)
-            throw new BusinessException(ErrorCode.STOCK_VALID, "감소 수량은 0보다 커야 합니다.");
-
-        if (quantity < amount)
-            throw new BusinessException(ErrorCode.STOCK_VALID, "재고가 부족합니다.");
-
+        validateDecreasable(amount);
         this.quantity -= amount;
     }
 
     public void increase(int amount) {
-        if (amount <= 0)
-            throw new BusinessException(ErrorCode.STOCK_VALID, "증가 수량은 0보다 커야 합니다.");
+        validateIncreasable(amount);
+        this.quantity += amount;
+    }
+
+    public void validateDecreasable(int amount) {
+        validatePositiveAmount(amount);
+
+        if (quantity < amount)
+            throw new BusinessException(ErrorCode.STOCK_VALID, "재고가 부족합니다.");
+    }
+
+    public void validateIncreasable(int amount) {
+        validatePositiveAmount(amount);
 
         if(this.quantity > Integer.MAX_VALUE - amount){
             throw new BusinessException(ErrorCode.STOCK_VALID, "재고 최대값을 초과했습니다.");
         }
-
-        this.quantity += amount;
     }
 
-    public boolean isSameProduct(UUID productId) {
-        if (productId == null) return false;
-        return this.productId.equals(productId);
+    public void validatePositiveAmount(int amount) {
+        if (amount <= 0)
+            throw new BusinessException(ErrorCode.STOCK_VALID, "재고 변경 수량은 0보다 커야 합니다.");
+    }
+
+    public boolean isSameHubProduct(UUID hubId, UUID productId) {
+        if (hubId == null || productId == null) return false;
+        return this.hubId.equals(hubId) && this.productId.equals(productId);
     }
 }

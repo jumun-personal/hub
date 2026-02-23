@@ -3,7 +3,7 @@ package com.jumunhasyeo.stock.infrastructure.dynamic;
 import com.jumunhasyeo.stock.application.StockVariationService;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
-import com.jumunhasyeo.stock.application.dto.response.StockRes;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
@@ -51,22 +51,12 @@ public class DynamicStockVariationServiceProxy implements StockVariationService 
     }
     
     @Override
-    public StockRes decrement(DecreaseStockCommand command) {
-        return resolve().decrement(command);
-    }
-
-    @Override
-    public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
+    public List<StockChangeRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
         return resolve().decrement(idempotencyKey, commands);
     }
-    
-    @Override
-    public StockRes increment(IncreaseStockCommand command) {
-        return resolve().increment(command);
-    }
 
     @Override
-    public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
+    public List<StockChangeRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
         return resolve().increment(idempotencyKey, commands);
     }
 }

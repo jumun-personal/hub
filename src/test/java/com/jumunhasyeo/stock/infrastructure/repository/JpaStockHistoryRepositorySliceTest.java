@@ -41,8 +41,8 @@ class JpaStockHistoryRepositorySliceTest extends RepositorySliceTest {
     }
 
     @Test
-    @DisplayName("동일 멱등키, 상품, 타입의 재고 이력은 중복 저장할 수 없다.")
-    void duplicate_idempotency_product_type_throws() {
+    @DisplayName("동일 멱등키, 허브 상품, 타입의 재고 이력은 중복 저장할 수 없다.")
+    void duplicate_idempotency_hub_product_type_throws() {
         UUID hubId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
         String idempotencyKey = "idem-duplicate";
@@ -50,10 +50,27 @@ class JpaStockHistoryRepositorySliceTest extends RepositorySliceTest {
         StockHistory history1 = StockHistory.ofDecrease(hubId, productId, 10, idempotencyKey);
         StockHistory history2 = StockHistory.ofDecrease(hubId, productId, 10, idempotencyKey);
 
-        jpaStockHistoryRepository.save(history1);
-        jpaStockHistoryRepository.save(history2);
+        jpaStockHistoryRepository.saveAndFlush(history1);
 
-        assertThatThrownBy(() -> testEntityManager.flush())
+        assertThatThrownBy(() -> jpaStockHistoryRepository.saveAndFlush(history2))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("동일 멱등키와 상품이어도 허브가 다르면 재고 이력을 저장할 수 있다.")
+    void same_idempotency_product_type_with_different_hub_success() {
+        UUID hubId1 = UUID.randomUUID();
+        UUID hubId2 = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        String idempotencyKey = "idem-different-hub";
+
+        StockHistory history1 = StockHistory.ofDecrease(hubId1, productId, 10, idempotencyKey);
+        StockHistory history2 = StockHistory.ofDecrease(hubId2, productId, 10, idempotencyKey);
+
+        jpaStockHistoryRepository.saveAll(List.of(history1, history2));
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        assertThat(jpaStockHistoryRepository.count()).isEqualTo(2);
     }
 }

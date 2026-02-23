@@ -3,7 +3,7 @@ package com.jumunhasyeo.stock.infrastructure.dynamic;
 import com.jumunhasyeo.stock.application.StockVariationService;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
 import com.jumunhasyeo.stock.application.command.IncreaseStockCommand;
-import com.jumunhasyeo.stock.application.dto.response.StockRes;
+import com.jumunhasyeo.stock.application.dto.response.StockChangeRes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -73,27 +73,25 @@ class StockVariationStrategyRegistryTest {
             return type;
         }
 
-        @Override
-        public StockRes decrement(DecreaseStockCommand command) {
-            return new StockRes(UUID.randomUUID(), UUID.randomUUID(), command.productId(), 0, null, null);
+        private StockChangeRes decrementOne(DecreaseStockCommand command) {
+            return StockChangeRes.decrease(UUID.randomUUID(), command.productId(), command.amount());
         }
 
         @Override
-        public List<StockRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
+        public List<StockChangeRes> decrement(String idempotencyKey, List<DecreaseStockCommand> commands) {
             return commands.stream()
-                    .map(this::decrement)
+                    .map(this::decrementOne)
                     .toList();
         }
 
-        @Override
-        public StockRes increment(IncreaseStockCommand command) {
-            return new StockRes(UUID.randomUUID(), UUID.randomUUID(), command.productId(), 0, null, null);
+        private StockChangeRes incrementOne(IncreaseStockCommand command) {
+            return StockChangeRes.increase(UUID.randomUUID(), command.productId(), command.amount());
         }
 
         @Override
-        public List<StockRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
+        public List<StockChangeRes> increment(String idempotencyKey, List<IncreaseStockCommand> commands) {
             return commands.stream()
-                    .map(this::increment)
+                    .map(this::incrementOne)
                     .toList();
         }
     }
