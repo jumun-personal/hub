@@ -1,11 +1,12 @@
 package com.jumunhasyeo.common.slack;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class SlackPublisher {
     public void publish(String title, String message) {
-        // TODO 실제 Slack 메시지 발송 로직 구현
-        System.out.println("Slack Alert - " + title + ": " + message);
+        log.warn("Slack publisher is not configured. title={}, message={}", title, message);
     }
 }

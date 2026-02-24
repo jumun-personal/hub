@@ -26,9 +26,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiRes<Void>> handleDataIntegrityViolation(
             DataIntegrityViolationException ex
     ) {
-        ex.printStackTrace();
-        log.error("DataIntegrityViolationException error: {}", ex.toString());
         String message = ex.toString();
+        log.warn("Data integrity constraint violated. cause={}", ex.getMostSpecificCause().getMessage());
 
         if (message != null && (message.contains("uk_hub_name_deleted") || message.contains("p_hub_name_key"))) {
             // 허브 이름 중복
@@ -49,8 +48,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiRes<?>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
-        ex.printStackTrace();
-        log.error("JSON parsing error: {}", ex.toString());
+        log.warn("Failed to parse request JSON. cause={}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity
                 .badRequest()
                 .body(ApiRes.error(INVALID_JSON.name(), INVALID_JSON.getMessage()));
@@ -62,7 +60,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiRes<?>> handleValidationException(MethodArgumentNotValidException ex) {
-        ex.printStackTrace();
         Map<String, String> errors = new HashMap<>();
 
         ex.getBindingResult().getAllErrors().forEach(error -> {
@@ -71,7 +68,7 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        log.error("Validation failed: {}", errors);
+        log.warn("Request validation failed. errors={}", errors);
 
         return ResponseEntity
                 .badRequest()
@@ -84,9 +81,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiRes<?>> handleBusinessException(BusinessException ex) {
-        ex.printStackTrace();
         ErrorCode errorCode = ex.getErrorCode();
-        log.error("BusinessException: {}", ex.toString());
+        log.warn("Business exception. code={}, message={}", errorCode.getCode(), ex.getMessage());
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ApiRes.error(errorCode.getCode(), errorCode.getMessage()));
@@ -98,8 +94,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiRes<?>> handleException(Exception ex) {
-        log.error("Unhandled exception: {}", ex.toString());
-        ex.printStackTrace();
+        log.error("Unhandled exception", ex);
         return ResponseEntity
                 .status(ErrorCode.INTERNAL_SERVER_ERROR.getStatus())
                 .body(ApiRes.error(ErrorCode.INTERNAL_SERVER_ERROR.getCode(),
