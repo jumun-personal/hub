@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RoutePairBuildProcessor {
 
-    private final HubRouteService hubRouteService;
+    private final RoutePairLifecycleService routePairLifecycleService;
     private final RouteWeightApiService routeWeightApiService;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
     private final RouteDelayPolicy routeDelayPolicy;
@@ -38,7 +38,7 @@ public class RoutePairBuildProcessor {
             return;
         }
 
-        Optional<RoutePairBuildTarget> claimed = hubRouteService.claimRoutePairBuild(routeIds);
+        Optional<RoutePairBuildTarget> claimed = routePairLifecycleService.claimRoutePairBuild(routeIds);
         if (claimed.isEmpty()) {
             return;
         }
@@ -46,7 +46,7 @@ public class RoutePairBuildProcessor {
         RoutePairBuildTarget target = claimed.get();
         try {
             RouteWeightResult result = routeWeightApiService.getRouteInfo(toQuery(target));
-            hubRouteService.completeRoutePairBuild(
+            routePairLifecycleService.completeRoutePairBuild(
                     target.routeIds(),
                     RouteWeight.of(result.distanceKm(), result.durationMinutes()),
                     toRouteProvider(result.provider()),
@@ -54,14 +54,14 @@ public class RoutePairBuildProcessor {
             );
         } catch (RouteRateLimitExceededException e) {
             log.debug("Route pair delayed by provider rate limit. routeIds={}", target.routeIds());
-            hubRouteService.deferRoutePairBuild(
+            routePairLifecycleService.deferRoutePairBuild(
                     target.routeIds(),
                     e.getMessage(),
                     routeDelayPolicy.rateLimitDelay(e.retryAfter())
             );
         } catch (RoutePrimaryRetryRequiredException e) {
             log.info("Retry Kakao primary route provider before fallback. routeIds={}", target.routeIds());
-            hubRouteService.failRoutePairBuild(
+            routePairLifecycleService.failRoutePairBuild(
                     target.routeIds(),
                     e.getMessage(),
                     maxRetries,
@@ -69,10 +69,10 @@ public class RoutePairBuildProcessor {
             );
         } catch (RouteRequestRejectedException | RouteResolutionRejectedException e) {
             log.warn("Route pair build rejected permanently. routeIds={}", target.routeIds(), e);
-            hubRouteService.failRoutePairBuildPermanently(target.routeIds(), e.getMessage());
+            routePairLifecycleService.failRoutePairBuildPermanently(target.routeIds(), e.getMessage());
         } catch (RuntimeException e) {
             log.warn("Route pair build failed. routeIds={}", target.routeIds(), e);
-            hubRouteService.failRoutePairBuild(
+            routePairLifecycleService.failRoutePairBuild(
                     target.routeIds(),
                     e.getMessage(),
                     maxRetries,
@@ -86,7 +86,7 @@ public class RoutePairBuildProcessor {
             return;
         }
 
-        Optional<RoutePairBuildTarget> claimed = hubRouteService.claimRoutePairRefresh(routeIds);
+        Optional<RoutePairBuildTarget> claimed = routePairLifecycleService.claimRoutePairRefresh(routeIds);
         if (claimed.isEmpty()) {
             return;
         }
@@ -96,34 +96,34 @@ public class RoutePairBuildProcessor {
             RouteWeightResult result = routeWeightApiService.getRouteInfo(
                     toQuery(target, ProviderHint.PRIMARY)
             );
-            hubRouteService.completeRoutePairRefresh(
+            routePairLifecycleService.completeRoutePairRefresh(
                     target.routeIds(),
                     RouteWeight.of(result.distanceKm(), result.durationMinutes()),
                     toRouteProvider(result.provider()),
                     result.fromFallback()
             );
         } catch (RouteRateLimitExceededException e) {
-            hubRouteService.deferRoutePairRefresh(
+            routePairLifecycleService.deferRoutePairRefresh(
                     target.routeIds(),
                     e.getMessage(),
                     routeDelayPolicy.rateLimitDelay(e.retryAfter())
             );
         } catch (RoutePrimaryRetryRequiredException e) {
-            hubRouteService.deferRoutePairRefresh(
+            routePairLifecycleService.deferRoutePairRefresh(
                     target.routeIds(),
                     e.getMessage(),
                     routeDelayPolicy.primaryRetryDelay()
             );
         } catch (RouteRequestRejectedException | RouteResolutionRejectedException e) {
             log.warn("Route pair refresh rejected. keep previous weight. routeIds={}", target.routeIds(), e);
-            hubRouteService.deferRoutePairRefresh(
+            routePairLifecycleService.deferRoutePairRefresh(
                     target.routeIds(),
                     e.getMessage(),
                     DurationStyle.detectAndParse(nonRetryableRefreshDelay)
             );
         } catch (RuntimeException e) {
             log.warn("Route pair refresh failed. routeIds={}", target.routeIds(), e);
-            hubRouteService.deferRoutePairRefresh(
+            routePairLifecycleService.deferRoutePairRefresh(
                     target.routeIds(),
                     e.getMessage(),
                     routeDelayPolicy.buildRetryDelay(target.retryCount())

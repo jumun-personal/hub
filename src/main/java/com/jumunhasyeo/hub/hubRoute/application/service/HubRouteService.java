@@ -8,12 +8,9 @@ import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.command.RouteBuildTarget;
-import com.jumunhasyeo.hub.hubRoute.application.command.RoutePairBuildTarget;
 import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
-import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus;
-import com.jumunhasyeo.hub.hubRoute.domain.entity.RouteProvider;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
@@ -22,18 +19,17 @@ import com.jumunhasyeo.hub.hubRoute.domain.service.HubRouteDomainService;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.convert.DurationStyle;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,12 +49,6 @@ public class HubRouteService {
     @Value("${hub.route.build.event-recovery-delay:5m}")
     private String eventRecoveryDelay;
 
-    @Value("${hub.route.refresh.interval:5m}")
-    private String routeRefreshInterval;
-
-    @Value("${hub.route.refresh.fallback-reconcile-delay:1m}")
-    private String fallbackReconcileDelay;
-
     /**
      * 새로운 Hub 생성 시 경로 자동 생성
      */
@@ -77,159 +67,6 @@ public class HubRouteService {
         } else if (!hubRouteRepository.hasIncompleteRoutes(command.hubId())) {
             hubRouteEventPublisher.publishRouteBuildCompleted(command);
         }
-    }
-
-    /**
-     * 중앙 허브에 대한 경로 생성
-     */
-    private Set<HubRoute> buildForCenter(BuildRouteCommand command) {
-        Hub newCenterHub = getHubIncludingCreating(command.hubId());
-        List<Hub> existingCenterHubs = hubRepository.findAllByHubType(HubType.CENTER)
-                .stream()
-                .filter(hub -> !hub.getHubId().equals(newCenterHub.getHubId()))  // 자기 자신 제외
-                .collect(Collectors.toList());
-        Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(newCenterHub);
-
-        // Domain Service에 Route 생성 로직 위임
-        Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewCenterHub(
-            command.hubId(),
-            newCenterHub,
-            existingCenterHubs
-        );
-        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
-        scheduleEventRecovery(filteredRoutes);
-
-        Set<UUID> insertedRouteIds = hubRouteRepository.insertIgnore(filteredRoutes);
-        return filterInsertedRoutes(filteredRoutes, insertedRouteIds);
-    }
-
-    /**
-     * 지점 허브에 대한 경로 생성
-     */
-    private Set<HubRoute> buildForBranch(BuildRouteCommand command) {
-        Hub branchHub = getHubIncludingCreating(command.hubId());
-        Hub centerHub = getHub(command.centerHubId());
-        Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(branchHub);
-
-        Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewBranchHub(
-            command.hubId(),
-            branchHub,
-            centerHub
-        );
-        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
-        scheduleEventRecovery(filteredRoutes);
-
-        Set<UUID> insertedRouteIds = hubRouteRepository.insertIgnore(filteredRoutes);
-        return filterInsertedRoutes(filteredRoutes, insertedRouteIds);
-    }
-
-    private Map<RouteKey, HubRoute> getExistingRouteMap(Hub hub) {
-        return hubRouteRepository.findByStartHubOrEndHub(hub, hub).stream()
-                .collect(Collectors.toMap(
-                        route -> routeKey(route.getStartHub(), route.getEndHub()),
-                        route -> route,
-                        (existing, ignored) -> existing,
-                        HashMap::new
-                ));
-    }
-
-    private Set<HubRoute> filterMissingRoutes(Set<HubRoute> routes, Map<RouteKey, HubRoute> existingRouteMap) {
-        return routes.stream()
-                .filter(route -> !existingRouteMap.containsKey(routeKey(route.getStartHub(), route.getEndHub())))
-                .collect(Collectors.toCollection(HashSet::new));
-    }
-
-    private Hub getHub(UUID hubId) {
-        return hubRepository.findById(hubId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-    }
-
-    private Hub getHubIncludingCreating(UUID hubId) {
-        return hubRepository.findByIdIncludingCreating(hubId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-    }
-
-    private Hub getHubIncludingDeleted(UUID hubId) {
-        return hubRepository.findByIdIncludingDeleted(hubId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-    }
-
-    private RoutePurpose resolvePurpose(Hub from, Hub to) {
-        if (from.isCenterHub() && to.isCenterHub()) {
-            return RoutePurpose.CENTER_TO_CENTER;
-        }
-        if ((from.isBranchHub() && to.isCenterHub()) || (from.isCenterHub() && to.isBranchHub())) {
-            return RoutePurpose.BRANCH_TO_CENTER;
-        }
-        return RoutePurpose.BRANCH_TO_BRANCH;
-    }
-
-    @Transactional
-    public Optional<RoutePairBuildTarget> claimRoutePairBuild(List<UUID> routeIds) {
-        List<UUID> distinctRouteIds = routeIds.stream().distinct().toList();
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(distinctRouteIds);
-        if (routes.size() != distinctRouteIds.size()) {
-            return Optional.empty();
-        }
-        LocalDateTime staleBefore = LocalDateTime.now()
-                .minus(eventRecoveryDelay());
-        boolean allClaimable = routes.stream().allMatch(route ->
-                HubRouteStatus.PENDING.equals(route.getStatus())
-                        || (HubRouteStatus.PROCESSING.equals(route.getStatus())
-                        && route.getModifiedAt() != null
-                        && route.getModifiedAt().isBefore(staleBefore))
-        );
-        if (!allClaimable) {
-            return Optional.empty();
-        }
-
-        routes.forEach(HubRoute::claimProcessing);
-        hubRouteRepository.saveAll(routes);
-        HubRoute representative = routes.get(0);
-        return Optional.of(new RoutePairBuildTarget(
-                routes.stream().map(HubRoute::getRouteId).toList(),
-                representative.getBuildHubId(),
-                representative.getStartHub().getHubId(),
-                representative.getStartHub().getCoordinate(),
-                representative.getEndHub().getCoordinate(),
-                resolvePurpose(representative.getStartHub(), representative.getEndHub()),
-                routes.stream().mapToInt(HubRoute::getRetryCount).max().orElse(0)
-        ));
-    }
-
-    @Transactional
-    public Optional<RoutePairBuildTarget> claimRoutePairRefresh(List<UUID> routeIds) {
-        List<UUID> distinctRouteIds = routeIds.stream().distinct().toList();
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(distinctRouteIds);
-        if (routes.size() != distinctRouteIds.size()) {
-            return Optional.empty();
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime staleBefore = now.minus(eventRecoveryDelay());
-        boolean allRefreshable = routes.stream().allMatch(route ->
-                route.isComplete()
-                        && (route.getNextRefreshAt() == null
-                        || !route.getNextRefreshAt().isAfter(now))
-                        && (route.getRefreshClaimedAt() == null
-                        || route.getRefreshClaimedAt().isBefore(staleBefore))
-        );
-        if (!allRefreshable) {
-            return Optional.empty();
-        }
-
-        routes.forEach(route -> route.claimRefresh(now));
-        hubRouteRepository.saveAll(routes);
-        HubRoute representative = routes.get(0);
-        return Optional.of(new RoutePairBuildTarget(
-                routes.stream().map(HubRoute::getRouteId).toList(),
-                representative.getBuildHubId(),
-                representative.getStartHub().getHubId(),
-                representative.getStartHub().getCoordinate(),
-                representative.getEndHub().getCoordinate(),
-                resolvePurpose(representative.getStartHub(), representative.getEndHub()),
-                0
-        ));
     }
 
     public List<UUID> claimRouteBuildTargets(int batchSize, Duration staleProcessingTimeout) {
@@ -299,41 +136,6 @@ public class HubRouteService {
     }
 
     @Transactional
-    public void completeRoutePairBuild(
-            List<UUID> routeIds,
-            RouteWeight routeWeight,
-            RouteProvider provider,
-            boolean fallback
-    ) {
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
-            return;
-        }
-        UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
-
-        List<HubRoute> completedRoutes = routes.stream()
-                .filter(route -> !route.isComplete())
-                .toList();
-        LocalDateTime nextRefreshAt = nextRefreshAt(routeIds, fallback);
-        completedRoutes.forEach(route -> route.complete(routeWeight, provider, fallback, nextRefreshAt));
-        hubRouteRepository.saveAll(completedRoutes);
-        if (!completedRoutes.isEmpty()) {
-            hubRouteEventPublisher.publishRouteCreatedEvent(
-                    completedRoutes.stream()
-                            .map(route -> HubRouteCreatedEvent.from(buildHubId, route))
-                            .toList()
-            );
-        }
-
-        if (buildHubId != null && !hubRouteRepository.hasIncompleteRoutes(buildHubId)) {
-            hubRouteEventPublisher.publishRouteBuildCompleted(buildCompletedCommand(buildHubId));
-        }
-    }
-
-    @Transactional
     public void failRouteBuild(UUID routeId, String reason, int maxRetries, Duration retryBackoff) {
         HubRoute route = hubRouteRepository.findByIdWithHubs(routeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_ROUTE_NOT_FOUND));
@@ -353,84 +155,82 @@ public class HubRouteService {
         }
     }
 
-    @Transactional
-    public void failRoutePairBuild(
-            List<UUID> routeIds,
-            String reason,
-            int maxRetries,
-            Duration retryBackoff
-    ) {
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
-            return;
-        }
-        UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
+    private Set<HubRoute> buildForCenter(BuildRouteCommand command) {
+        Hub newCenterHub = getHubIncludingCreating(command.hubId());
+        List<Hub> existingCenterHubs = hubRepository.findAllByHubType(HubType.CENTER)
+                .stream()
+                .filter(hub -> !hub.getHubId().equals(newCenterHub.getHubId()))
+                .collect(Collectors.toList());
+        Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(newCenterHub);
 
-        LocalDateTime nextRetryAt = LocalDateTime.now().plus(retryBackoff);
-        boolean finalFailed = routes.stream()
-                .filter(route -> !route.isComplete())
-                .map(route -> route.failOrRetry(reason, maxRetries, nextRetryAt))
-                .reduce(false, Boolean::logicalOr);
-        hubRouteRepository.saveAll(routes);
+        Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewCenterHub(
+                command.hubId(),
+                newCenterHub,
+                existingCenterHubs
+        );
+        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
+        scheduleEventRecovery(filteredRoutes);
 
-        if (finalFailed && buildHubId != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(buildHubId, reason);
-        }
+        Set<UUID> insertedRouteIds = hubRouteRepository.insertIgnore(filteredRoutes);
+        return filterInsertedRoutes(filteredRoutes, insertedRouteIds);
     }
 
-    @Transactional
-    public void failRoutePairBuildPermanently(List<UUID> routeIds, String reason) {
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
-            return;
-        }
-        UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
+    private Set<HubRoute> buildForBranch(BuildRouteCommand command) {
+        Hub branchHub = getHubIncludingCreating(command.hubId());
+        Hub centerHub = getHub(command.centerHubId());
+        Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(branchHub);
 
-        routes.stream()
-                .filter(route -> !route.isComplete())
-                .forEach(route -> route.failPermanently(reason));
-        hubRouteRepository.saveAll(routes);
+        Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewBranchHub(
+                command.hubId(),
+                branchHub,
+                centerHub
+        );
+        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
+        scheduleEventRecovery(filteredRoutes);
 
-        if (buildHubId != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(buildHubId, reason);
-        }
+        Set<UUID> insertedRouteIds = hubRouteRepository.insertIgnore(filteredRoutes);
+        return filterInsertedRoutes(filteredRoutes, insertedRouteIds);
     }
 
-    @Transactional
-    public void deferRoutePairBuild(List<UUID> routeIds, String reason, Duration delay) {
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        LocalDateTime nextAttemptAt = LocalDateTime.now().plus(delay);
-        routes.stream()
-                .filter(route -> !route.isComplete())
-                .forEach(route -> route.defer(nextAttemptAt, reason));
-        hubRouteRepository.saveAll(routes);
+    private Map<RouteKey, HubRoute> getExistingRouteMap(Hub hub) {
+        return hubRouteRepository.findByStartHubOrEndHub(hub, hub).stream()
+                .collect(Collectors.toMap(
+                        route -> routeKey(route.getStartHub(), route.getEndHub()),
+                        route -> route,
+                        (existing, ignored) -> existing,
+                        HashMap::new
+                ));
     }
 
-    @Transactional
-    public void completeRoutePairRefresh(
-            List<UUID> routeIds,
-            RouteWeight routeWeight,
-            RouteProvider provider,
-            boolean fallback
-    ) {
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        LocalDateTime nextRefreshAt = nextRefreshAt(routeIds, fallback);
-        routes.forEach(route -> route.completeRefresh(routeWeight, provider, fallback, nextRefreshAt));
-        hubRouteRepository.saveAll(routes);
+    private Set<HubRoute> filterMissingRoutes(Set<HubRoute> routes, Map<RouteKey, HubRoute> existingRouteMap) {
+        return routes.stream()
+                .filter(route -> !existingRouteMap.containsKey(routeKey(route.getStartHub(), route.getEndHub())))
+                .collect(Collectors.toCollection(HashSet::new));
     }
 
-    @Transactional
-    public void deferRoutePairRefresh(List<UUID> routeIds, String reason, Duration delay) {
-        List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        LocalDateTime nextAttemptAt = LocalDateTime.now().plus(delay);
-        routes.forEach(route -> route.deferRefresh(nextAttemptAt, reason));
-        hubRouteRepository.saveAll(routes);
+    private Hub getHub(UUID hubId) {
+        return hubRepository.findById(hubId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
+    }
+
+    private Hub getHubIncludingCreating(UUID hubId) {
+        return hubRepository.findByIdIncludingCreating(hubId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
+    }
+
+    private Hub getHubIncludingDeleted(UUID hubId) {
+        return hubRepository.findByIdIncludingDeleted(hubId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
+    }
+
+    private RoutePurpose resolvePurpose(Hub from, Hub to) {
+        if (from.isCenterHub() && to.isCenterHub()) {
+            return RoutePurpose.CENTER_TO_CENTER;
+        }
+        if ((from.isBranchHub() && to.isCenterHub()) || (from.isCenterHub() && to.isBranchHub())) {
+            return RoutePurpose.BRANCH_TO_CENTER;
+        }
+        return RoutePurpose.BRANCH_TO_BRANCH;
     }
 
     private Set<HubRoute> filterInsertedRoutes(Set<HubRoute> routes, Set<UUID> insertedRouteIds) {
@@ -443,45 +243,13 @@ public class HubRouteService {
     }
 
     private void scheduleEventRecovery(Set<HubRoute> routes) {
-        LocalDateTime recoveryAt = LocalDateTime.now()
-                .plus(eventRecoveryDelay());
+        LocalDateTime recoveryAt = LocalDateTime.now().plus(eventRecoveryDelay());
         routes.forEach(route -> route.scheduleRecovery(recoveryAt));
-    }
-
-    private LocalDateTime nextRefreshAt(List<UUID> routeIds) {
-        Duration interval = routeRefreshInterval();
-        long intervalSeconds = Math.max(1, interval.getSeconds());
-        long nowEpochSecond = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-        long nextCycleStart = Math.floorDiv(nowEpochSecond, intervalSeconds) * intervalSeconds
-                + intervalSeconds;
-        int pairHash = routeIds.stream()
-                .map(UUID::toString)
-                .sorted()
-                .reduce("", String::concat)
-                .hashCode();
-        long slotOffset = Math.floorMod(pairHash, intervalSeconds);
-        return LocalDateTime.ofEpochSecond(nextCycleStart + slotOffset, 0, ZoneOffset.UTC);
-    }
-
-    private LocalDateTime nextRefreshAt(List<UUID> routeIds, boolean fallback) {
-        if (fallback) {
-            String delay = fallbackReconcileDelay == null || fallbackReconcileDelay.isBlank()
-                    ? "1m"
-                    : fallbackReconcileDelay;
-            return LocalDateTime.now().plus(DurationStyle.detectAndParse(delay));
-        }
-        return nextRefreshAt(routeIds);
     }
 
     private Duration eventRecoveryDelay() {
         return DurationStyle.detectAndParse(
                 eventRecoveryDelay == null || eventRecoveryDelay.isBlank() ? "5m" : eventRecoveryDelay
-        );
-    }
-
-    private Duration routeRefreshInterval() {
-        return DurationStyle.detectAndParse(
-                routeRefreshInterval == null || routeRefreshInterval.isBlank() ? "5m" : routeRefreshInterval
         );
     }
 
@@ -517,23 +285,20 @@ public class HubRouteService {
     @Transactional
     public void deleteRoutesForHub(UUID hubId, Long deletedBy) {
         Hub hub = getHubIncludingDeleted(hubId);
-        
-        // 해당 Hub가 시작점이거나 끝점인 모든 경로 조회
         List<HubRoute> routes = hubRouteRepository.findByStartHubOrEndHub(hub, hub);
-        
+
         if (routes.isEmpty()) {
             log.info("No routes found for hub: {}", hub.getName());
             return;
         }
-        
-        // 모든 경로 소프트 삭제
+
         routes.forEach(route -> route.markDeleted(deletedBy));
         hubRouteRepository.saveAll(routes);
 
-        List<HubRouteDeletedEvent> createEventList = routes.stream()
+        List<HubRouteDeletedEvent> deleteEvents = routes.stream()
                 .map(HubRouteDeletedEvent::from)
                 .collect(Collectors.toList());
-        hubRouteEventPublisher.publishRouteDeletedEvent(createEventList);
+        hubRouteEventPublisher.publishRouteDeletedEvent(deleteEvents);
     }
 
     public List<HubRouteRes> getALLRoute() {
