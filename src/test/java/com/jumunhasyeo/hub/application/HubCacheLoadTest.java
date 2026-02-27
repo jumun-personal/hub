@@ -1,5 +1,10 @@
 package com.jumunhasyeo.hub.application;
 
+import com.jumunhasyeo.common.scheduler.HubRouteBuildScheduler;
+import com.jumunhasyeo.common.scheduler.HubRouteRefreshScheduler;
+import com.jumunhasyeo.common.scheduler.IdempotentScheduler;
+import com.jumunhasyeo.common.scheduler.InboxPollingScheduler;
+import com.jumunhasyeo.common.scheduler.OutboxPollingScheduler;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
@@ -7,6 +12,7 @@ import com.jumunhasyeo.testsupport.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +20,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
@@ -26,8 +33,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +52,7 @@ class HubCacheLoadTest extends IntegrationTest {
     private static final int REQUESTS = 3_000;
     private static final int CONCURRENCY = 50;
     private static final int WARMUP_REQUESTS = 200;
+    private static final int COLD_MISS_REQUESTS = 50;
 
     @LocalServerPort
     private int port;
@@ -59,8 +69,25 @@ class HubCacheLoadTest extends IntegrationTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @MockitoBean
+    private OutboxPollingScheduler outboxPollingScheduler;
+
+    @MockitoBean
+    private InboxPollingScheduler inboxPollingScheduler;
+
+    @MockitoBean
+    private IdempotentScheduler idempotentScheduler;
+
+    @MockitoBean
+    private HubRouteBuildScheduler hubRouteBuildScheduler;
+
+    @MockitoBean
+    private HubRouteRefreshScheduler hubRouteRefreshScheduler;
+
+    @BeforeEach
     @Override
     protected void truncateTables() {
+        super.truncateTables();
         clearCaches();
     }
 
@@ -91,6 +118,33 @@ class HubCacheLoadTest extends IntegrationTest {
         assertThat(withoutCache.successes()).isEqualTo(REQUESTS);
         assertThat(withRedisCache.successes()).isEqualTo(REQUESTS);
         assertThat(withRedisCache.preparedStatements()).isLessThan(withoutCache.preparedStatements());
+    }
+
+    @Test
+    @DisplayName("캐시 무효화 직후 동일 허브 동시 조회는 DB 조회 한 번으로 병합된다")
+    void coldMissSingleFlightMergesConcurrentDbLoads() throws Exception {
+        // given
+        UUID hubId = createHub();
+        switchCache("REDIS");
+        clearCaches();
+
+        Statistics statistics = entityManager.getEntityManagerFactory()
+                .unwrap(SessionFactory.class)
+                .getStatistics();
+        statistics.clear();
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(2))
+                .build();
+
+        // when
+        LoadResult result = runConcurrentColdMiss(client, hubId, statistics);
+
+        // then
+        System.out.printf("%n=== Hub single-flight cold-miss result ===%n%s%n", result);
+        assertThat(result.successes()).isEqualTo(COLD_MISS_REQUESTS);
+        assertThat(result.preparedStatements()).isEqualTo(1);
+        assertThat(redisTemplate.hasKey("hub::" + hubId)).isTrue();
     }
 
     private UUID createHub() {
@@ -159,6 +213,57 @@ class HubCacheLoadTest extends IntegrationTest {
                 elapsedNanos,
                 statistics.getPrepareStatementCount()
         );
+    }
+
+    private LoadResult runConcurrentColdMiss(
+            HttpClient client,
+            UUID hubId,
+            Statistics statistics
+    ) throws Exception {
+        ExecutorService executorService = Executors.newFixedThreadPool(COLD_MISS_REQUESTS);
+        CountDownLatch ready = new CountDownLatch(COLD_MISS_REQUESTS);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<RequestResult>> futures = new ArrayList<>(COLD_MISS_REQUESTS);
+
+        try {
+            for (int i = 0; i < COLD_MISS_REQUESTS; i++) {
+                futures.add(executorService.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(5, TimeUnit.SECONDS)) {
+                        return new RequestResult(false, 0);
+                    }
+                    return sendGetHubRequest(client, hubId);
+                }));
+            }
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            long started = System.nanoTime();
+            start.countDown();
+
+            List<RequestResult> requestResults = new ArrayList<>(COLD_MISS_REQUESTS);
+            for (Future<RequestResult> future : futures) {
+                requestResults.add(future.get(10, TimeUnit.SECONDS));
+            }
+            long elapsedNanos = System.nanoTime() - started;
+
+            List<Long> latencies = requestResults.stream()
+                    .filter(RequestResult::success)
+                    .map(RequestResult::elapsedNanos)
+                    .sorted()
+                    .toList();
+
+            return LoadResult.from(
+                    "REDIS_COLD_SINGLE_FLIGHT",
+                    requestResults.size(),
+                    latencies,
+                    elapsedNanos,
+                    statistics.getPrepareStatementCount()
+            );
+        } finally {
+            start.countDown();
+            executorService.shutdownNow();
+            assertThat(executorService.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     private void switchCache(String cacheType) throws Exception {
