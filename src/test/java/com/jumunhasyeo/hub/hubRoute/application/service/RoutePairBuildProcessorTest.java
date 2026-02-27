@@ -34,7 +34,7 @@ import static org.mockito.Mockito.times;
 class RoutePairBuildProcessorTest {
 
     @Mock
-    private HubRouteService hubRouteService;
+    private RoutePairLifecycleService routePairLifecycleService;
     @Mock
     private RouteWeightApiService routeWeightApiService;
     @Mock
@@ -47,7 +47,7 @@ class RoutePairBuildProcessorTest {
     @BeforeEach
     void setUp() {
         processor = new RoutePairBuildProcessor(
-                hubRouteService,
+                routePairLifecycleService,
                 routeWeightApiService,
                 routeProviderAvailabilityService,
                 routeDelayPolicy
@@ -63,7 +63,7 @@ class RoutePairBuildProcessorTest {
         List<UUID> routeIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         RoutePairBuildTarget target = target(routeIds);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
+        given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
         given(routeWeightApiService.getRouteInfo(any())).willReturn(
                 new RouteWeightResult(BigDecimal.valueOf(12.3), 25, MapProvider.KAKAO, false)
         );
@@ -76,13 +76,13 @@ class RoutePairBuildProcessorTest {
         ArgumentCaptor<RouteWeightQuery> queryCaptor = ArgumentCaptor.forClass(RouteWeightQuery.class);
         then(routeWeightApiService).should().getRouteInfo(queryCaptor.capture());
         assertThat(queryCaptor.getValue().providerHint()).isEqualTo(ProviderHint.PRIMARY);
-        then(hubRouteService).should().completeRoutePairBuild(
+        then(routePairLifecycleService).should().completeRoutePairBuild(
                 org.mockito.ArgumentMatchers.eq(routeIds),
                 any(),
                 org.mockito.ArgumentMatchers.eq(RouteProvider.KAKAO),
                 org.mockito.ArgumentMatchers.eq(false)
         );
-        then(hubRouteService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
+        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
     }
 
     @Test
@@ -93,7 +93,7 @@ class RoutePairBuildProcessorTest {
         RoutePairBuildTarget target = target(routeIds);
         Duration retryDelay = Duration.ofMillis(5500);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
+        given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
         given(routeWeightApiService.getRouteInfo(any())).willThrow(
                 new RoutePrimaryRetryRequiredException("retry Kakao", new RuntimeException())
         );
@@ -103,8 +103,8 @@ class RoutePairBuildProcessorTest {
         processor.process(routeIds);
 
         // then
-        then(hubRouteService).should().failRoutePairBuild(routeIds, "retry Kakao", 3, retryDelay);
-        then(hubRouteService).should(never()).failRoutePairBuildPermanently(any(), any());
+        then(routePairLifecycleService).should().failRoutePairBuild(routeIds, "retry Kakao", 3, retryDelay);
+        then(routePairLifecycleService).should(never()).failRoutePairBuildPermanently(any(), any());
     }
 
     @Test
@@ -114,7 +114,7 @@ class RoutePairBuildProcessorTest {
         List<UUID> routeIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         RoutePairBuildTarget target = target(routeIds, 1);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
+        given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
         given(routeWeightApiService.getRouteInfo(any())).willReturn(
                 new RouteWeightResult(BigDecimal.TEN, 20, MapProvider.NAVER, true)
         );
@@ -126,7 +126,7 @@ class RoutePairBuildProcessorTest {
         ArgumentCaptor<RouteWeightQuery> queryCaptor = ArgumentCaptor.forClass(RouteWeightQuery.class);
         then(routeWeightApiService).should().getRouteInfo(queryCaptor.capture());
         assertThat(queryCaptor.getValue().providerHint()).isEqualTo(ProviderHint.ANY);
-        then(hubRouteService).should().completeRoutePairBuild(
+        then(routePairLifecycleService).should().completeRoutePairBuild(
                 org.mockito.ArgumentMatchers.eq(routeIds),
                 any(),
                 org.mockito.ArgumentMatchers.eq(RouteProvider.NAVER),
@@ -141,7 +141,7 @@ class RoutePairBuildProcessorTest {
         List<UUID> routeIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         RoutePairBuildTarget target = target(routeIds);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
+        given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
         given(routeWeightApiService.getRouteInfo(any()))
                 .willThrow(new RouteRateLimitExceededException(MapProvider.KAKAO));
         given(routeDelayPolicy.rateLimitDelay(Duration.ofSeconds(1)))
@@ -151,12 +151,12 @@ class RoutePairBuildProcessorTest {
         processor.process(routeIds);
 
         // then
-        then(hubRouteService).should().deferRoutePairBuild(
+        then(routePairLifecycleService).should().deferRoutePairBuild(
                 routeIds,
                 "KAKAO route rate limit exhausted",
                 Duration.ofMillis(1200)
         );
-        then(hubRouteService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
+        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
     }
 
     @Test
@@ -167,7 +167,7 @@ class RoutePairBuildProcessorTest {
         RoutePairBuildTarget target = target(routeIds);
         Duration retryDelay = Duration.ofSeconds(11);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
+        given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
         given(routeWeightApiService.getRouteInfo(any()))
                 .willThrow(new RouteProvidersUnavailableException("providers down", new RuntimeException()));
         given(routeDelayPolicy.buildRetryDelay(0)).willReturn(retryDelay);
@@ -176,13 +176,13 @@ class RoutePairBuildProcessorTest {
         processor.process(routeIds);
 
         // then
-        then(hubRouteService).should().failRoutePairBuild(
+        then(routePairLifecycleService).should().failRoutePairBuild(
                 routeIds,
                 "providers down",
                 3,
                 retryDelay
         );
-        then(hubRouteService).should(never()).failRoutePairBuildPermanently(any(), any());
+        then(routePairLifecycleService).should(never()).failRoutePairBuildPermanently(any(), any());
     }
 
     @Test
@@ -192,7 +192,7 @@ class RoutePairBuildProcessorTest {
         List<UUID> routeIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         RoutePairBuildTarget target = target(routeIds);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
+        given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
         given(routeWeightApiService.getRouteInfo(any()))
                 .willThrow(new RouteRequestRejectedException(MapProvider.KAKAO, "invalid route"));
 
@@ -200,8 +200,8 @@ class RoutePairBuildProcessorTest {
         processor.process(routeIds);
 
         // then
-        then(hubRouteService).should().failRoutePairBuildPermanently(routeIds, "invalid route");
-        then(hubRouteService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
+        then(routePairLifecycleService).should().failRoutePairBuildPermanently(routeIds, "invalid route");
+        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
     }
 
     private RoutePairBuildTarget target(List<UUID> routeIds) {
