@@ -1,7 +1,7 @@
 package com.jumunhasyeo.common.scheduler;
 
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
-import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteWorkLifecycle;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +27,7 @@ class HubRouteRefreshSchedulerTest {
     @Mock
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
     @Mock
-    private RoutePairBuildProcessor routePairBuildProcessor;
+    private RouteWorkLifecycle routeWorkLifecycle;
 
     private HubRouteRefreshScheduler scheduler;
 
@@ -36,7 +36,7 @@ class HubRouteRefreshSchedulerTest {
         scheduler = new HubRouteRefreshScheduler(
                 hubRouteService,
                 routeProviderAvailabilityService,
-                routePairBuildProcessor
+                routeWorkLifecycle
         );
         ReflectionTestUtils.setField(scheduler, "batchSize", 10);
         ReflectionTestUtils.setField(scheduler, "staleTimeout", "5m");
@@ -54,7 +54,7 @@ class HubRouteRefreshSchedulerTest {
 
         // then
         then(hubRouteService).should(never()).findRouteRefreshTargets(10, Duration.ofMinutes(5));
-        then(routePairBuildProcessor).shouldHaveNoInteractions();
+        then(routeWorkLifecycle).shouldHaveNoInteractions();
     }
 
     @Test
@@ -73,6 +73,6 @@ class HubRouteRefreshSchedulerTest {
         scheduler.refreshDueRoutes();
 
         // then
-        then(routePairBuildProcessor).should().processRefresh(routePairIds);
+        then(routeWorkLifecycle).should().refresh(routePairIds);
     }
 }

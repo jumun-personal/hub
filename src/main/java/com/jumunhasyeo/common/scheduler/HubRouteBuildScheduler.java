@@ -2,7 +2,7 @@ package com.jumunhasyeo.common.scheduler;
 
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
-import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteWorkLifecycle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +23,7 @@ public class HubRouteBuildScheduler {
 
     private final HubRouteService hubRouteService;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
-    private final RoutePairBuildProcessor routePairBuildProcessor;
+    private final RouteWorkLifecycle routeWorkLifecycle;
 
     @Value("${hub.route.build.batch-size:10}")
     private int batchSize;
@@ -42,7 +42,7 @@ public class HubRouteBuildScheduler {
         for (UUID routeId : routeIds) {
             List<UUID> routePairIds = hubRouteService.findRoutePairIds(routeId);
             if (!routePairIds.isEmpty()) {
-                routePairBuildProcessor.process(routePairIds);
+                routeWorkLifecycle.build(routePairIds);
             }
         }
     }

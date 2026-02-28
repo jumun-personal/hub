@@ -31,24 +31,24 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
-class RoutePairBuildProcessorTest {
+class RouteWorkLifecycleTest {
 
     @Mock
     private RoutePairLifecycleService routePairLifecycleService;
     @Mock
-    private RouteWeightApiService routeWeightApiService;
+    private RouteProviderResolution routeProviderResolution;
     @Mock
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
     @Mock
     private RouteDelayPolicy routeDelayPolicy;
 
-    private RoutePairBuildProcessor processor;
+    private RouteWorkLifecycle processor;
 
     @BeforeEach
     void setUp() {
-        processor = new RoutePairBuildProcessor(
+        processor = new RouteWorkLifecycle(
                 routePairLifecycleService,
-                routeWeightApiService,
+                routeProviderResolution,
                 routeProviderAvailabilityService,
                 routeDelayPolicy
         );
@@ -64,17 +64,17 @@ class RoutePairBuildProcessorTest {
         RoutePairBuildTarget target = target(routeIds);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
         given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any())).willReturn(
+        given(routeProviderResolution.resolve(any())).willReturn(
                 new RouteWeightResult(BigDecimal.valueOf(12.3), 25, MapProvider.KAKAO, false)
         );
 
         // when
-        processor.process(routeIds);
+        processor.build(routeIds);
 
         // then
-        then(routeWeightApiService).should(times(1)).getRouteInfo(any());
+        then(routeProviderResolution).should(times(1)).resolve(any());
         ArgumentCaptor<RouteWeightQuery> queryCaptor = ArgumentCaptor.forClass(RouteWeightQuery.class);
-        then(routeWeightApiService).should().getRouteInfo(queryCaptor.capture());
+        then(routeProviderResolution).should().resolve(queryCaptor.capture());
         assertThat(queryCaptor.getValue().providerHint()).isEqualTo(ProviderHint.PRIMARY);
         then(routePairLifecycleService).should().completeRoutePairBuild(
                 org.mockito.ArgumentMatchers.eq(routeIds),
@@ -94,13 +94,13 @@ class RoutePairBuildProcessorTest {
         Duration retryDelay = Duration.ofMillis(5500);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
         given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any())).willThrow(
+        given(routeProviderResolution.resolve(any())).willThrow(
                 new RoutePrimaryRetryRequiredException("retry Kakao", new RuntimeException())
         );
         given(routeDelayPolicy.primaryRetryDelay()).willReturn(retryDelay);
 
         // when
-        processor.process(routeIds);
+        processor.build(routeIds);
 
         // then
         then(routePairLifecycleService).should().failRoutePairBuild(routeIds, "retry Kakao", 3, retryDelay);
@@ -115,16 +115,16 @@ class RoutePairBuildProcessorTest {
         RoutePairBuildTarget target = target(routeIds, 1);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
         given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any())).willReturn(
+        given(routeProviderResolution.resolve(any())).willReturn(
                 new RouteWeightResult(BigDecimal.TEN, 20, MapProvider.NAVER, true)
         );
 
         // when
-        processor.process(routeIds);
+        processor.build(routeIds);
 
         // then
         ArgumentCaptor<RouteWeightQuery> queryCaptor = ArgumentCaptor.forClass(RouteWeightQuery.class);
-        then(routeWeightApiService).should().getRouteInfo(queryCaptor.capture());
+        then(routeProviderResolution).should().resolve(queryCaptor.capture());
         assertThat(queryCaptor.getValue().providerHint()).isEqualTo(ProviderHint.ANY);
         then(routePairLifecycleService).should().completeRoutePairBuild(
                 org.mockito.ArgumentMatchers.eq(routeIds),
@@ -142,13 +142,13 @@ class RoutePairBuildProcessorTest {
         RoutePairBuildTarget target = target(routeIds);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
         given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any()))
+        given(routeProviderResolution.resolve(any()))
                 .willThrow(new RouteRateLimitExceededException(MapProvider.KAKAO));
         given(routeDelayPolicy.rateLimitDelay(Duration.ofSeconds(1)))
                 .willReturn(Duration.ofMillis(1200));
 
         // when
-        processor.process(routeIds);
+        processor.build(routeIds);
 
         // then
         then(routePairLifecycleService).should().deferRoutePairBuild(
@@ -168,12 +168,12 @@ class RoutePairBuildProcessorTest {
         Duration retryDelay = Duration.ofSeconds(11);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
         given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any()))
+        given(routeProviderResolution.resolve(any()))
                 .willThrow(new RouteProvidersUnavailableException("providers down", new RuntimeException()));
         given(routeDelayPolicy.buildRetryDelay(0)).willReturn(retryDelay);
 
         // when
-        processor.process(routeIds);
+        processor.build(routeIds);
 
         // then
         then(routePairLifecycleService).should().failRoutePairBuild(
@@ -193,11 +193,11 @@ class RoutePairBuildProcessorTest {
         RoutePairBuildTarget target = target(routeIds);
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
         given(routePairLifecycleService.claimRoutePairBuild(routeIds)).willReturn(Optional.of(target));
-        given(routeWeightApiService.getRouteInfo(any()))
+        given(routeProviderResolution.resolve(any()))
                 .willThrow(new RouteRequestRejectedException(MapProvider.KAKAO, "invalid route"));
 
         // when
-        processor.process(routeIds);
+        processor.build(routeIds);
 
         // then
         then(routePairLifecycleService).should().failRoutePairBuildPermanently(routeIds, "invalid route");
