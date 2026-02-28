@@ -1,14 +1,8 @@
 package com.jumunhasyeo.common.scheduler;
 
-import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.hub.hubRoute.application.command.RouteBuildTarget;
-import com.jumunhasyeo.hub.hubRoute.application.dto.MapProvider;
-import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
-import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
-import com.jumunhasyeo.hub.hubRoute.application.service.RouteWeightApiService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,10 +11,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,9 +27,6 @@ class HubRouteBuildSchedulerTest {
 
     @Mock
     private HubRouteService hubRouteService;
-
-    @Mock
-    private RouteWeightApiService routeWeightApiService;
 
     @Mock
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
@@ -89,15 +78,4 @@ class HubRouteBuildSchedulerTest {
         then(routePairBuildProcessor).should().process(routePairIds);
     }
 
-    private RouteBuildTarget routeBuildTarget(UUID routeId) {
-        return new RouteBuildTarget(
-                routeId,
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                Coordinate.of(37.5, 127.0),
-                UUID.randomUUID(),
-                Coordinate.of(35.8, 128.6),
-                RoutePurpose.CENTER_TO_CENTER
-        );
-    }
 }

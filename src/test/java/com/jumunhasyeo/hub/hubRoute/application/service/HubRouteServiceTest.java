@@ -9,7 +9,6 @@ import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
 import com.jumunhasyeo.hub.hubRoute.domain.service.HubRouteDomainService;
@@ -24,7 +23,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -209,38 +207,6 @@ class HubRouteServiceTest {
 
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteRepository, never()).insertIgnore(any(Set.class));
-    }
-
-    @Test
-    @DisplayName("스케줄러가 경로 가중치 저장을 완료하면 생성 이벤트와 전체 완료 이벤트를 발행한다.")
-    void complete_route_build_publishes_created_and_completed_events() {
-        UUID buildHubId = center1.getHubId();
-        HubRoute route = HubRoute.skeleton(buildHubId, center1, center2);
-        route.claimProcessing();
-        when(hubRouteRepository.findByIdWithHubs(route.getRouteId())).thenReturn(Optional.of(route));
-        when(hubRouteRepository.hasIncompleteRoutes(buildHubId)).thenReturn(false);
-        when(hubRepository.findByIdIncludingCreating(buildHubId)).thenReturn(Optional.of(center1));
-
-        hubRouteService.completeRouteBuild(route.getRouteId(), RouteWeight.of(BigDecimal.valueOf(11.9), 32));
-
-        assertThat(route.isComplete()).isTrue();
-        verify(hubRouteRepository).save(route);
-        verify(hubRouteEventPublisher).publishRouteCreatedEvent(argThat(events -> events.size() == 1));
-        verify(hubRouteEventPublisher).publishRouteBuildCompleted(any(BuildRouteCommand.class));
-    }
-
-    @Test
-    @DisplayName("경로 가중치 저장이 최종 실패하면 허브 생성 보상을 수행한다.")
-    void fail_route_build_compensates_hub_when_retry_exhausted() {
-        UUID buildHubId = center1.getHubId();
-        HubRoute route = HubRoute.skeleton(buildHubId, center1, center2);
-        route.claimProcessing();
-        when(hubRouteRepository.findByIdWithHubs(route.getRouteId())).thenReturn(Optional.of(route));
-
-        hubRouteService.failRouteBuild(route.getRouteId(), "map down", 1, Duration.ofSeconds(30));
-
-        verify(hubRouteRepository).save(route);
-        verify(hubRouteEventPublisher).publishRouteBuildFailed(buildHubId, "map down");
     }
 
     @Test

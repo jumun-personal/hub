@@ -2,7 +2,6 @@ package com.jumunhasyeo.hub.hubRoute.infrastructure.repository;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
-import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,11 +50,6 @@ public class AdapterHubRouteRepository implements HubRouteRepository {
 
     private final JpaHubRouteRepositoryImpl repository;
     private final JdbcTemplate jdbcTemplate;
-
-    @Override
-    public void save(HubRoute forwardRoute) {
-        repository.save(forwardRoute);
-    }
 
     @Override
     public void saveAll(List<HubRoute> routes) {
@@ -129,17 +122,6 @@ public class AdapterHubRouteRepository implements HubRouteRepository {
     }
 
     @Override
-    @Transactional
-    public List<UUID> claimPendingForBuild(int limit, LocalDateTime now, LocalDateTime staleBefore) {
-        List<UUID> routeIds = repository.findBuildTargetIdsForUpdateSkipLocked(limit, now, staleBefore);
-        if (routeIds.isEmpty()) {
-            return routeIds;
-        }
-        repository.markProcessing(routeIds, HubRouteStatus.PROCESSING, now);
-        return routeIds;
-    }
-
-    @Override
     public List<UUID> findRecoveryTargetIds(int limit, LocalDateTime now, LocalDateTime staleBefore) {
         return repository.findRecoveryTargetIds(limit, now, staleBefore);
     }
@@ -152,11 +134,6 @@ public class AdapterHubRouteRepository implements HubRouteRepository {
     @Override
     public List<UUID> findRoutePairIds(UUID routeId) {
         return repository.findRoutePairIds(routeId);
-    }
-
-    @Override
-    public Optional<HubRoute> findByIdWithHubs(UUID routeId) {
-        return repository.findByIdWithHubs(routeId);
     }
 
     @Override
