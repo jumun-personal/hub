@@ -7,16 +7,12 @@ import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
-import com.jumunhasyeo.hub.hubRoute.application.command.RouteBuildTarget;
-import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteCreatedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
 import com.jumunhasyeo.hub.hubRoute.domain.service.HubRouteDomainService;
-import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -69,15 +64,6 @@ public class HubRouteService {
         }
     }
 
-    public List<UUID> claimRouteBuildTargets(int batchSize, Duration staleProcessingTimeout) {
-        LocalDateTime now = LocalDateTime.now();
-        return hubRouteRepository.claimPendingForBuild(
-                batchSize,
-                now,
-                now.minus(staleProcessingTimeout)
-        );
-    }
-
     public List<UUID> findRouteBuildRecoveryTargets(int batchSize, Duration staleProcessingTimeout) {
         LocalDateTime now = LocalDateTime.now();
         return hubRouteRepository.findRecoveryTargetIds(
@@ -102,57 +88,6 @@ public class HubRouteService {
 
     public boolean hasActiveBuildWork() {
         return hubRouteRepository.hasActiveBuildWork();
-    }
-
-    public Optional<RouteBuildTarget> getRouteBuildTarget(UUID routeId) {
-        return hubRouteRepository.findByIdWithHubs(routeId)
-                .filter(route -> !route.isComplete())
-                .map(route -> new RouteBuildTarget(
-                        route.getRouteId(),
-                        route.getBuildHubId(),
-                        route.getStartHub().getHubId(),
-                        route.getStartHub().getCoordinate(),
-                        route.getEndHub().getHubId(),
-                        route.getEndHub().getCoordinate(),
-                        resolvePurpose(route.getStartHub(), route.getEndHub())
-                ));
-    }
-
-    @Transactional
-    public void completeRouteBuild(UUID routeId, RouteWeight routeWeight) {
-        HubRoute route = hubRouteRepository.findByIdWithHubs(routeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_ROUTE_NOT_FOUND));
-        if (route.isComplete()) {
-            return;
-        }
-
-        route.complete(routeWeight);
-        hubRouteRepository.save(route);
-        hubRouteEventPublisher.publishRouteCreatedEvent(List.of(HubRouteCreatedEvent.from(route.getBuildHubId(), route)));
-
-        if (route.getBuildHubId() != null && !hubRouteRepository.hasIncompleteRoutes(route.getBuildHubId())) {
-            hubRouteEventPublisher.publishRouteBuildCompleted(buildCompletedCommand(route.getBuildHubId()));
-        }
-    }
-
-    @Transactional
-    public void failRouteBuild(UUID routeId, String reason, int maxRetries, Duration retryBackoff) {
-        HubRoute route = hubRouteRepository.findByIdWithHubs(routeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_ROUTE_NOT_FOUND));
-        if (route.isComplete()) {
-            return;
-        }
-
-        boolean finalFailed = route.failOrRetry(
-                reason,
-                maxRetries,
-                LocalDateTime.now().plus(retryBackoff)
-        );
-        hubRouteRepository.save(route);
-
-        if (finalFailed && route.getBuildHubId() != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(route.getBuildHubId(), reason);
-        }
     }
 
     private Set<HubRoute> buildForCenter(BuildRouteCommand command) {
@@ -223,16 +158,6 @@ public class HubRouteService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
     }
 
-    private RoutePurpose resolvePurpose(Hub from, Hub to) {
-        if (from.isCenterHub() && to.isCenterHub()) {
-            return RoutePurpose.CENTER_TO_CENTER;
-        }
-        if ((from.isBranchHub() && to.isCenterHub()) || (from.isCenterHub() && to.isBranchHub())) {
-            return RoutePurpose.BRANCH_TO_CENTER;
-        }
-        return RoutePurpose.BRANCH_TO_BRANCH;
-    }
-
     private Set<HubRoute> filterInsertedRoutes(Set<HubRoute> routes, Set<UUID> insertedRouteIds) {
         if (insertedRouteIds == null || insertedRouteIds.isEmpty()) {
             return Set.of();
@@ -269,14 +194,6 @@ public class HubRouteService {
             events.add(new HubRouteBuildRequestedEvent(hubId, routeIds));
         }
         return events;
-    }
-
-    private BuildRouteCommand buildCompletedCommand(UUID buildHubId) {
-        Hub hub = getHubIncludingCreating(buildHubId);
-        UUID centerHubId = hub.isBranchHub()
-                ? hub.getCenterHubs().stream().findFirst().map(Hub::getHubId).orElse(null)
-                : null;
-        return new BuildRouteCommand(centerHubId, hub.getHubId(), hub.getName(), hub.getAddress(), hub.getHubType());
     }
 
     /**

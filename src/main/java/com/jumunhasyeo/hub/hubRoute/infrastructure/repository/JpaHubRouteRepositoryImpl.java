@@ -10,7 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import jakarta.persistence.LockModeType;
 
@@ -100,30 +99,6 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
               AND (
                     (
                         route_status = 'PENDING'
-                        AND (next_retry_at IS NULL OR next_retry_at <= :now)
-                    )
-                    OR (
-                        route_status = 'PROCESSING'
-                        AND modified_at < :staleBefore
-                    )
-              )
-            ORDER BY created_at
-            LIMIT :limit
-            FOR UPDATE SKIP LOCKED
-            """, nativeQuery = true)
-    List<UUID> findBuildTargetIdsForUpdateSkipLocked(
-            @Param("limit") int limit,
-            @Param("now") java.time.LocalDateTime now,
-            @Param("staleBefore") java.time.LocalDateTime staleBefore
-    );
-
-    @Query(value = """
-            SELECT route_id
-            FROM p_hub_route
-            WHERE is_deleted = false
-              AND (
-                    (
-                        route_status = 'PENDING'
                         AND next_retry_at IS NOT NULL
                         AND next_retry_at <= :now
                     )
@@ -171,30 +146,6 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
             ORDER BY pair.route_id
             """, nativeQuery = true)
     List<UUID> findRoutePairIds(@Param("routeId") UUID routeId);
-
-    @Modifying
-    @Query("""
-            UPDATE HubRoute route
-            SET route.status = :status,
-                route.nextRetryAt = NULL,
-                route.errorMessage = NULL,
-                route.modifiedAt = :claimedAt
-            WHERE route.routeId IN :routeIds
-            """)
-    int markProcessing(
-            @Param("routeIds") List<UUID> routeIds,
-            @Param("status") HubRouteStatus status,
-            @Param("claimedAt") java.time.LocalDateTime claimedAt
-    );
-
-    @Query("""
-            SELECT route
-            FROM HubRoute route
-            JOIN FETCH route.startHub
-            JOIN FETCH route.endHub
-            WHERE route.routeId = :routeId
-            """)
-    Optional<HubRoute> findByIdWithHubs(@Param("routeId") UUID routeId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
