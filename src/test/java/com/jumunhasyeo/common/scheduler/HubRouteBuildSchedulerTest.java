@@ -2,7 +2,7 @@ package com.jumunhasyeo.common.scheduler;
 
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
-import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteWorkLifecycle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class HubRouteBuildSchedulerTest {
     @Mock
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
     @Mock
-    private RoutePairBuildProcessor routePairBuildProcessor;
+    private RouteWorkLifecycle routeWorkLifecycle;
 
     private HubRouteBuildScheduler scheduler;
 
@@ -40,7 +40,7 @@ class HubRouteBuildSchedulerTest {
         scheduler = new HubRouteBuildScheduler(
                 hubRouteService,
                 routeProviderAvailabilityService,
-                routePairBuildProcessor
+                routeWorkLifecycle
         );
         ReflectionTestUtils.setField(scheduler, "batchSize", 10);
         ReflectionTestUtils.setField(scheduler, "staleProcessingTimeout", "5m");
@@ -57,7 +57,7 @@ class HubRouteBuildSchedulerTest {
 
         // then
         then(hubRouteService).should(never()).findRouteBuildRecoveryTargets(anyInt(), any(Duration.class));
-        then(routePairBuildProcessor).shouldHaveNoInteractions();
+        then(routeWorkLifecycle).shouldHaveNoInteractions();
     }
 
     @Test
@@ -75,7 +75,7 @@ class HubRouteBuildSchedulerTest {
         scheduler.buildPendingRoutes();
 
         // then
-        then(routePairBuildProcessor).should().process(routePairIds);
+        then(routeWorkLifecycle).should().build(routePairIds);
     }
 
 }

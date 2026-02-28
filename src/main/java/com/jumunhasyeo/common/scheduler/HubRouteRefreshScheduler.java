@@ -1,7 +1,7 @@
 package com.jumunhasyeo.common.scheduler;
 
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
-import com.jumunhasyeo.hub.hubRoute.application.service.RoutePairBuildProcessor;
+import com.jumunhasyeo.hub.hubRoute.application.service.RouteWorkLifecycle;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +21,7 @@ public class HubRouteRefreshScheduler {
 
     private final HubRouteService hubRouteService;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
-    private final RoutePairBuildProcessor routePairBuildProcessor;
+    private final RouteWorkLifecycle routeWorkLifecycle;
 
     @Value("${hub.route.refresh.batch-size:10}")
     private int batchSize;
@@ -42,7 +42,7 @@ public class HubRouteRefreshScheduler {
         for (UUID candidate : candidates) {
             List<UUID> routePairIds = hubRouteService.findRoutePairIds(candidate);
             if (!routePairIds.isEmpty()) {
-                routePairBuildProcessor.processRefresh(routePairIds);
+                routeWorkLifecycle.refresh(routePairIds);
             }
         }
     }

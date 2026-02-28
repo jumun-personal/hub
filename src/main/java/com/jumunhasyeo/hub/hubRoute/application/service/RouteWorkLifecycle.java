@@ -4,8 +4,8 @@ import com.jumunhasyeo.hub.hubRoute.application.command.RoutePairBuildTarget;
 import com.jumunhasyeo.hub.hubRoute.application.dto.ProviderHint;
 import com.jumunhasyeo.hub.hubRoute.application.dto.request.RouteWeightQuery;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.RouteWeightResult;
-import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.RouteProvider;
+import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,13 +16,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Route Pair의 claim부터 resolve, complete/defer/fail까지 소유하는 work lifecycle Module.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RoutePairBuildProcessor {
+public class RouteWorkLifecycle {
 
     private final RoutePairLifecycleService routePairLifecycleService;
-    private final RouteWeightApiService routeWeightApiService;
+    private final RouteProviderResolution routeProviderResolution;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
     private final RouteDelayPolicy routeDelayPolicy;
 
@@ -32,7 +35,7 @@ public class RoutePairBuildProcessor {
     @Value("${hub.route.refresh.non-retryable-delay:30m}")
     private String nonRetryableRefreshDelay;
 
-    public void process(List<UUID> routeIds) {
+    public void build(List<UUID> routeIds) {
         if (routeProviderAvailabilityService.isAllProvidersUnavailable()) {
             log.info("Skip route pair build. providers are unavailable. routeIds={}", routeIds);
             return;
@@ -45,7 +48,7 @@ public class RoutePairBuildProcessor {
 
         RoutePairBuildTarget target = claimed.get();
         try {
-            RouteWeightResult result = routeWeightApiService.getRouteInfo(toQuery(target));
+            RouteWeightResult result = routeProviderResolution.resolve(toQuery(target));
             routePairLifecycleService.completeRoutePairBuild(
                     target.routeIds(),
                     RouteWeight.of(result.distanceKm(), result.durationMinutes()),
@@ -81,7 +84,7 @@ public class RoutePairBuildProcessor {
         }
     }
 
-    public void processRefresh(List<UUID> routeIds) {
+    public void refresh(List<UUID> routeIds) {
         if (routeProviderAvailabilityService.isAllProvidersUnavailable()) {
             return;
         }
@@ -93,9 +96,7 @@ public class RoutePairBuildProcessor {
 
         RoutePairBuildTarget target = claimed.get();
         try {
-            RouteWeightResult result = routeWeightApiService.getRouteInfo(
-                    toQuery(target, ProviderHint.PRIMARY)
-            );
+            RouteWeightResult result = routeProviderResolution.resolve(toQuery(target, ProviderHint.PRIMARY));
             routePairLifecycleService.completeRoutePairRefresh(
                     target.routeIds(),
                     RouteWeight.of(result.distanceKm(), result.durationMinutes()),
@@ -132,9 +133,7 @@ public class RoutePairBuildProcessor {
     }
 
     private RouteWeightQuery toQuery(RoutePairBuildTarget target) {
-        ProviderHint providerHint = target.retryCount() == 0
-                ? ProviderHint.PRIMARY
-                : ProviderHint.ANY;
+        ProviderHint providerHint = target.retryCount() == 0 ? ProviderHint.PRIMARY : ProviderHint.ANY;
         return toQuery(target, providerHint);
     }
 
@@ -158,5 +157,4 @@ public class RoutePairBuildProcessor {
             case UNKNOWN -> RouteProvider.UNKNOWN;
         };
     }
-
 }

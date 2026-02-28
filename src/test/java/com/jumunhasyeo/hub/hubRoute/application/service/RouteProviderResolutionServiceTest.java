@@ -43,9 +43,9 @@ import static org.mockito.Mockito.times;
 
 @SpringJUnitConfig
 @ContextConfiguration(classes = {
-        ResilientRouteWeightApiService.class,
+        RouteProviderResolutionService.class,
         RouteProviderMetrics.class,
-        ResilientRouteWeightApiServiceTest.TestConfig.class
+        RouteProviderResolutionServiceTest.TestConfig.class
 })
 @ImportAutoConfiguration({
         AopAutoConfiguration.class,
@@ -78,10 +78,10 @@ import static org.mockito.Mockito.times;
         "resilience4j.ratelimiter.instances.naverRoute.limitRefreshPeriod=1s",
         "resilience4j.ratelimiter.instances.naverRoute.timeoutDuration=0ms"
 })
-class ResilientRouteWeightApiServiceTest {
+class RouteProviderResolutionServiceTest {
 
     @Autowired
-    private RouteWeightApiService routeWeightApiService;
+    private RouteProviderResolution routeProviderResolution;
 
     @Autowired
     private KakaoWeightRouteApiServiceImpl kakaoStrategy;
@@ -124,7 +124,7 @@ class ResilientRouteWeightApiServiceTest {
         given(naverStrategy.getWeight(any())).willReturn(naverResult);
 
         // when
-        RouteWeightResult result = routeWeightApiService.getRouteInfo(query);
+        RouteWeightResult result = routeProviderResolution.resolve(query);
 
         // then
         assertThat(result.provider()).isEqualTo(MapProvider.NAVER);
@@ -153,7 +153,7 @@ class ResilientRouteWeightApiServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RoutePrimaryRetryRequiredException.class);
         then(kakaoStrategy).should(times(1)).getWeight(any());
         then(naverStrategy).shouldHaveNoInteractions();
@@ -170,7 +170,7 @@ class ResilientRouteWeightApiServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RouteRateLimitExceededException.class);
         then(kakaoStrategy).shouldHaveNoInteractions();
         then(naverStrategy).shouldHaveNoInteractions();
@@ -190,7 +190,7 @@ class ResilientRouteWeightApiServiceTest {
         given(naverStrategy.getWeight(any())).willReturn(naverResult);
 
         // when
-        RouteWeightResult result = routeWeightApiService.getRouteInfo(query);
+        RouteWeightResult result = routeProviderResolution.resolve(query);
 
         // then
         assertThat(result.provider()).isEqualTo(MapProvider.NAVER);
@@ -213,7 +213,7 @@ class ResilientRouteWeightApiServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RouteProvidersUnavailableException.class);
         then(kakaoStrategy).should(never()).getWeight(any());
         then(naverStrategy).should(times(1)).getWeight(any());
@@ -230,7 +230,7 @@ class ResilientRouteWeightApiServiceTest {
         circuitBreakerRegistry.circuitBreaker("naverRoute").transitionToOpenState();
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RouteProvidersUnavailableException.class);
         then(kakaoStrategy).should(never()).getWeight(any());
         then(naverStrategy).should(never()).getWeight(any());
@@ -252,7 +252,7 @@ class ResilientRouteWeightApiServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RouteProvidersUnavailableException.class);
         then(kakaoStrategy).should(times(1)).getWeight(any());
         then(naverStrategy).should(times(1)).getWeight(any());
@@ -269,7 +269,7 @@ class ResilientRouteWeightApiServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RouteRequestRejectedException.class);
         then(naverStrategy).shouldHaveNoInteractions();
         then(routeProviderAvailabilityService).should(never()).markAllProvidersUnavailable(any());
@@ -288,7 +288,7 @@ class ResilientRouteWeightApiServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> routeWeightApiService.getRouteInfo(query))
+        assertThatThrownBy(() -> routeProviderResolution.resolve(query))
                 .isInstanceOf(RouteResolutionRejectedException.class);
         then(kakaoStrategy).should(times(1)).getWeight(any());
         then(naverStrategy).should(times(1)).getWeight(any());
@@ -341,7 +341,7 @@ class ResilientRouteWeightApiServiceTest {
         long latencyBefore = timerCount("kakao");
 
         // when
-        routeWeightApiService.getRouteInfo(query);
+        routeProviderResolution.resolve(query);
 
         // then
         assertThat(counter("kakao", "initial", "success"))
@@ -366,7 +366,7 @@ class ResilientRouteWeightApiServiceTest {
         double fallbackSuccessBefore = counter("naver", "fallback", "success");
 
         // when
-        routeWeightApiService.getRouteInfo(query);
+        routeProviderResolution.resolve(query);
 
         // then
         assertThat(counter("kakao", "retry", "timeout"))
@@ -421,12 +421,16 @@ class ResilientRouteWeightApiServiceTest {
 
         @Bean
         KakaoWeightRouteApiServiceImpl kakaoStrategy() {
-            return mock(KakaoWeightRouteApiServiceImpl.class);
+            KakaoWeightRouteApiServiceImpl strategy = mock(KakaoWeightRouteApiServiceImpl.class);
+            given(strategy.provider()).willReturn(MapProvider.KAKAO);
+            return strategy;
         }
 
         @Bean
         NaverWeightRouteApiServiceImpl naverStrategy() {
-            return mock(NaverWeightRouteApiServiceImpl.class);
+            NaverWeightRouteApiServiceImpl strategy = mock(NaverWeightRouteApiServiceImpl.class);
+            given(strategy.provider()).willReturn(MapProvider.NAVER);
+            return strategy;
         }
 
         @Bean
