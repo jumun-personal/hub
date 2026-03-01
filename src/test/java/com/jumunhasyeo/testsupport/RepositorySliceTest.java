@@ -3,10 +3,8 @@ package com.jumunhasyeo.testsupport;
 import com.jumunhasyeo.CleanUp;
 import com.jumunhasyeo.CommonTestContainer;
 import com.jumunhasyeo.RepositoryTestConfig;
-import com.jumunhasyeo.common.Idempotency.db.infrastructure.repository.IdempotencyKeyRepositoryAdapter;
 import com.jumunhasyeo.common.config.JpaConfig;
 import com.jumunhasyeo.stock.infrastructure.inbox.InboxRepositoryAdapter;
-import com.jumunhasyeo.hub.infrastructure.outbox.OutboxRepositoryAdapter;
 import com.jumunhasyeo.company.infrastructure.repository.CompanyRepositoryAdapter;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.HubRepositoryAdapter;
 import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepositoryCustomImpl;
@@ -20,9 +18,7 @@ import org.springframework.context.annotation.Import;
 
 @Import({
         CompanyRepositoryAdapter.class,
-        OutboxRepositoryAdapter.class,
         InboxRepositoryAdapter.class,
-        IdempotencyKeyRepositoryAdapter.class,
         HubRepositoryAdapter.class,
         JpaHubRepositoryCustomImpl.class,
         CleanUp.class, RepositoryTestConfig.class, JpaConfig.class

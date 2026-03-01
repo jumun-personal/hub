@@ -1,6 +1,5 @@
 package com.jumunhasyeo.stock.application;
 
-import com.jumunhasyeo.stock.infrastructure.dynamic.StockLockType;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
@@ -10,9 +9,7 @@ import com.jumunhasyeo.stock.domain.entity.StockHistory;
 import com.jumunhasyeo.stock.domain.repository.StockHistoryRepository;
 import com.jumunhasyeo.stock.domain.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,18 +19,11 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Primary
-@Qualifier("stockVariationStrategy")
-@ConditionalOnProperty(name = "dynamic.enabled", havingValue = "false", matchIfMissing = true)
+@ConditionalOnProperty(name = "stock.lock-type", havingValue = "DEFAULT", matchIfMissing = true)
 public class StockVariationServiceImpl implements StockVariationService {
 
     private final StockRepository stockRepository;
     private final StockHistoryRepository stockHistoryRepository;
-
-    @Override
-    public StockLockType type() {
-        return StockLockType.DEFAULT;
-    }
 
     @Override
     @Transactional

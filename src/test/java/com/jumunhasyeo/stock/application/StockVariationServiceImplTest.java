@@ -2,7 +2,6 @@ package com.jumunhasyeo.stock.application;
 
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.stock.infrastructure.dynamic.StockLockType;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
@@ -41,12 +40,6 @@ class StockVariationServiceImplTest {
     private StockHistoryRepository stockHistoryRepository;
     @InjectMocks
     private StockVariationServiceImpl stockService;
-
-    @Test
-    @DisplayName("전략 타입은 DEFAULT이다.")
-    void strategy_type_default() {
-        assertThat(stockService.type()).isEqualTo(StockLockType.DEFAULT);
-    }
 
     @Test
     @DisplayName("hub에 상품재고를 감소시킬 수 있다.")

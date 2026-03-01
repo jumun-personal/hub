@@ -24,8 +24,7 @@ import static org.mockito.Mockito.mock;
 class HubServiceConfigTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(HubServiceConfig.class, MockHubDependenciesConfig.class)
-            .withPropertyValues("dynamic.enabled=false");
+            .withUserConfiguration(HubServiceConfig.class, MockHubDependenciesConfig.class);
 
     @Test
     @DisplayName("REDIS 캐시 설정 시 HubRedisCachedDecoratorService가 주입된다")

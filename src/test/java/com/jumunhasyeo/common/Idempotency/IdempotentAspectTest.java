@@ -1,6 +1,5 @@
 package com.jumunhasyeo.common.Idempotency;
 
-import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.exception.BusinessException;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;
