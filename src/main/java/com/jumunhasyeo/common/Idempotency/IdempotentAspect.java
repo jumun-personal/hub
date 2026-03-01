@@ -1,6 +1,5 @@
 package com.jumunhasyeo.common.Idempotency;
 
-import com.jumunhasyeo.common.Idempotency.db.domain.IdempotentStatus;
 import com.jumunhasyeo.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -21,7 +21,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  */
 @Configuration
 @Slf4j
-@ConditionalOnProperty(name = "dynamic.enabled", havingValue = "false", matchIfMissing = true)
 public class HubServiceConfig {
 
     @Bean

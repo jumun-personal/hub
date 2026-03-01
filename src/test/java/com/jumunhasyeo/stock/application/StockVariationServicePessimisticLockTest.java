@@ -1,6 +1,5 @@
 package com.jumunhasyeo.stock.application;
 
-import com.jumunhasyeo.stock.infrastructure.dynamic.StockLockType;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.stock.application.command.DecreaseStockCommand;
@@ -35,12 +34,6 @@ class StockVariationServicePessimisticLockTest {
 
     @InjectMocks
     private StockVariationServicePessimisticLock service;
-
-    @Test
-    @DisplayName("전략 타입은 PESSIMISTIC_LOCK이다.")
-    void strategy_type_pessimistic_lock() {
-        assertThat(service.type()).isEqualTo(StockLockType.PESSIMISTIC_LOCK);
-    }
 
     @Test
     @DisplayName("비관적 락으로 재고를 감소시킨다.")

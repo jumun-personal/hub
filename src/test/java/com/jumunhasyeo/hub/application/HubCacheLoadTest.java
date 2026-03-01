@@ -2,7 +2,6 @@ package com.jumunhasyeo.hub.application;
 
 import com.jumunhasyeo.common.scheduler.HubRouteBuildScheduler;
 import com.jumunhasyeo.common.scheduler.HubRouteRefreshScheduler;
-import com.jumunhasyeo.common.scheduler.IdempotentScheduler;
 import com.jumunhasyeo.common.scheduler.InboxPollingScheduler;
 import com.jumunhasyeo.common.scheduler.OutboxPollingScheduler;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
@@ -32,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,9 +47,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class HubCacheLoadTest extends IntegrationTest {
 
-    private static final int REQUESTS = 3_000;
-    private static final int CONCURRENCY = 50;
-    private static final int WARMUP_REQUESTS = 200;
     private static final int COLD_MISS_REQUESTS = 50;
 
     @LocalServerPort
@@ -76,9 +71,6 @@ class HubCacheLoadTest extends IntegrationTest {
     private InboxPollingScheduler inboxPollingScheduler;
 
     @MockitoBean
-    private IdempotentScheduler idempotentScheduler;
-
-    @MockitoBean
     private HubRouteBuildScheduler hubRouteBuildScheduler;
 
     @MockitoBean
@@ -92,40 +84,10 @@ class HubCacheLoadTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("허브 단건 조회 Cache-Aside 적용 전후 부하 테스트")
-    void compareHubFindByIdLoadWithAndWithoutRedisCache() throws Exception {
-        UUID hubId = createHub();
-
-        LoadResult withoutCache = runScenario("NONE", hubId);
-        LoadResult withRedisCache = runScenario("REDIS", hubId);
-
-        double averageImprovement = improvement(withoutCache.averageMs(), withRedisCache.averageMs());
-        double p95Improvement = improvement(withoutCache.p95Ms(), withRedisCache.p95Ms());
-        double throughputImprovement = throughputImprovement(withoutCache.requestsPerSecond(), withRedisCache.requestsPerSecond());
-        double dbStatementReduction = improvement(withoutCache.preparedStatements(), withRedisCache.preparedStatements());
-
-        System.out.printf("%n=== Hub cache load test result ===%n");
-        System.out.println(withoutCache);
-        System.out.println(withRedisCache);
-        System.out.printf(
-                "improvement average=%.2f%% p95=%.2f%% throughput=%.2f%% dbPreparedStatements=%.2f%%%n",
-                averageImprovement,
-                p95Improvement,
-                throughputImprovement,
-                dbStatementReduction
-        );
-
-        assertThat(withoutCache.successes()).isEqualTo(REQUESTS);
-        assertThat(withRedisCache.successes()).isEqualTo(REQUESTS);
-        assertThat(withRedisCache.preparedStatements()).isLessThan(withoutCache.preparedStatements());
-    }
-
-    @Test
     @DisplayName("캐시 무효화 직후 동일 허브 동시 조회는 DB 조회 한 번으로 병합된다")
     void coldMissSingleFlightMergesConcurrentDbLoads() throws Exception {
         // given
         UUID hubId = createHub();
-        switchCache("REDIS");
         clearCaches();
 
         Statistics statistics = entityManager.getEntityManagerFactory()
@@ -159,60 +121,6 @@ class HubCacheLoadTest extends IntegrationTest {
             entityManager.clear();
             return hub.getHubId();
         });
-    }
-
-    private LoadResult runScenario(String cacheType, UUID hubId) throws Exception {
-        switchCache(cacheType);
-        clearCaches();
-
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(2))
-                .build();
-
-        for (int i = 0; i < WARMUP_REQUESTS; i++) {
-            sendGetHubRequest(client, hubId);
-        }
-
-        Statistics statistics = entityManager.getEntityManagerFactory()
-                .unwrap(SessionFactory.class)
-                .getStatistics();
-        statistics.clear();
-
-        ExecutorService executorService = Executors.newFixedThreadPool(CONCURRENCY);
-        List<Callable<RequestResult>> tasks = new ArrayList<>(REQUESTS);
-        for (int i = 0; i < REQUESTS; i++) {
-            tasks.add(() -> sendGetHubRequest(client, hubId));
-        }
-
-        long started = System.nanoTime();
-        List<RequestResult> requestResults = executorService.invokeAll(tasks)
-                .stream()
-                .map(future -> {
-                    try {
-                        return future.get();
-                    } catch (Exception e) {
-                        return new RequestResult(false, 0);
-                    }
-                })
-                .toList();
-        long elapsedNanos = System.nanoTime() - started;
-
-        executorService.shutdown();
-        assertThat(executorService.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
-
-        List<Long> latencies = requestResults.stream()
-                .filter(RequestResult::success)
-                .map(RequestResult::elapsedNanos)
-                .sorted()
-                .toList();
-
-        return LoadResult.from(
-                cacheType,
-                requestResults.size(),
-                latencies,
-                elapsedNanos,
-                statistics.getPrepareStatementCount()
-        );
     }
 
     private LoadResult runConcurrentColdMiss(
@@ -266,18 +174,6 @@ class HubCacheLoadTest extends IntegrationTest {
         }
     }
 
-    private void switchCache(String cacheType) throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + "/internal/api/v1/dynamic/hub?type=" + cacheType))
-                .PUT(HttpRequest.BodyPublishers.noBody())
-                .timeout(Duration.ofSeconds(3))
-                .build();
-
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        assertThat(response.statusCode()).isEqualTo(200);
-    }
-
     private RequestResult sendGetHubRequest(HttpClient client, UUID hubId) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/internal/api/v1/hubs/" + hubId))
@@ -309,20 +205,6 @@ class HubCacheLoadTest extends IntegrationTest {
 
     private String baseUrl() {
         return "http://localhost:" + port;
-    }
-
-    private double improvement(double before, double after) {
-        if (before == 0) {
-            return 0;
-        }
-        return ((before - after) / before) * 100.0;
-    }
-
-    private double throughputImprovement(double before, double after) {
-        if (before == 0) {
-            return 0;
-        }
-        return ((after - before) / before) * 100.0;
     }
 
     private record RequestResult(boolean success, long elapsedNanos) {

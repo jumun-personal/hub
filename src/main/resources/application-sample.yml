@@ -96,6 +96,14 @@ cache:
   config:
     hubService: ${HUB_SERVICE_CACHEABLE:REDIS}
 
+stock:
+  lock-type: ${STOCK_LOCK_TYPE:DEFAULT}
+  events:
+    enabled: ${STOCK_EVENTS_ENABLED:true}
+  inbox:
+    scheduler:
+      enabled: ${STOCK_INBOX_SCHEDULER_ENABLED:true}
+
 kakao:
   mobility:
     base-url: ${KAKAO_MOBILITY_BASE_URL:https://apis-navi.kakaomobility.com}
