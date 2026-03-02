@@ -2,11 +2,13 @@ package com.jumunhasyeo.hub.infrastructure.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
+import com.jumunhasyeo.hub.hub.infrastructure.repository.JpaHubRepository;
 import com.jumunhasyeo.testsupport.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,16 +24,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 
-public class OutboxServiceIntegrationTest extends IntegrationTest {
+public class OutboxPublicationServiceIntegrationTest extends IntegrationTest {
 
     @Autowired
-    private OutboxService outboxService;
+    private OutboxPublicationService outboxService;
 
     @Autowired
     private JpaOutboxRepository jpaOutboxRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JpaHubRepository jpaHubRepository;
 
     @Test
     @DisplayName("HubCreatedEvent를 저장하고 조회할 수 있다.")
@@ -41,7 +46,7 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
         HubCreatedEvent event = HubCreatedEvent.centerHub(hub);
 
         //when
-        outboxService.save(event);
+        outboxService.append(event);
 
         //then
         List<OutboxEvent> events = jpaOutboxRepository.findAll();
@@ -58,54 +63,13 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
         HubDeletedEvent event = HubDeletedEvent.from(hub, 1L);
 
         //when
-        outboxService.save(event);
+        outboxService.append(event);
 
         //then
         List<OutboxEvent> events = jpaOutboxRepository.findAll();
         assertThat(events).hasSize(1);
         assertThat(events.get(0).getEventName()).isEqualTo("HubDeletedEvent");
         assertThat(events.get(0).getStatus()).isEqualTo(OutboxStatus.PENDING);
-    }
-
-    @Test
-    @DisplayName("PENDING 상태의 이벤트 100개를 조회할 수 있다.")
-    void findTop100ByStatusOrderByIdAsc_integration_success() {
-        //given
-        for (int i = 0; i < 5; i++) {
-            OutboxEvent event = OutboxEvent.of(
-                    "HubCreatedEvent",
-                    "{\"hubId\":\"" + i + "\"}",
-                    "test-key-" + i,
-                    "hub"
-            );
-            jpaOutboxRepository.save(event);
-        }
-
-        //when
-        List<OutboxEvent> events = outboxService.findTop100ByStatusOrderByIdAsc(OutboxStatus.PENDING);
-
-        //then
-        assertThat(events).hasSize(5);
-    }
-
-    @Test
-    @DisplayName("이벤트를 완료 상태로 표시할 수 있다.")
-    void markAsProcessed_integration_success() {
-        //given
-        OutboxEvent event = OutboxEvent.of(
-                "HubCreatedEvent",
-                "{\"hubId\":\"123\"}",
-                "test-key",
-                "hub"
-        );
-        jpaOutboxRepository.save(event);
-
-        //when
-        outboxService.markAsProcessed(event.getEventKey());
-
-        //then
-        OutboxEvent savedEvent = jpaOutboxRepository.findByEventKey(event.getEventKey()).orElseThrow();
-        assertThat(savedEvent.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
     }
 
     @Test
@@ -132,7 +96,7 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
         LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
 
         //when
-        int deletedCount = outboxService.cleanUp(cutoff);
+        int deletedCount = outboxService.cleanupCompletedBefore(cutoff);
 
         //then
         assertThat(deletedCount).isEqualTo(1);
@@ -188,6 +152,33 @@ public class OutboxServiceIntegrationTest extends IntegrationTest {
         OutboxEvent savedEvent = jpaOutboxRepository.findByEventKey(event.getEventKey()).orElseThrow();
         assertThat(savedEvent.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(savedEvent.getErrorMessage()).isEqualTo("Max retry count exceeded");
+    }
+
+    @Test
+    @DisplayName("Hub 생성 Outbox가 DEAD가 되면 PENDING Hub를 FAILED로 전환한다.")
+    void publishClaimedEvent_WhenHubCreatedEventBecomesDead_marksHubFailed() {
+        // given
+        Hub hub = jpaHubRepository.save(Hub.of(
+                "Outbox 실패 허브",
+                Address.of("서울시", Coordinate.of(37.5, 127.0)),
+                HubType.CENTER
+        ));
+        HubCreatedEvent createdEvent = HubCreatedEvent.centerHub(hub);
+        outboxService.append(createdEvent);
+
+        OutboxEvent outboxEvent = jpaOutboxRepository.findByEventKey(createdEvent.getEventKey()).orElseThrow();
+        outboxEvent.incrementRetryCount();
+        outboxEvent.incrementRetryCount();
+        outboxEvent.incrementRetryCount();
+        jpaOutboxRepository.saveAndFlush(outboxEvent);
+
+        // when
+        outboxService.publishClaimedEvent(outboxEvent);
+
+        // then
+        Hub failedHub = jpaHubRepository.findByIdIncludingDeleted(hub.getHubId()).orElseThrow();
+        assertThat(failedHub.getStatus()).isEqualTo(HubStatus.FAILED);
+        assertThat(failedHub.isDeleted()).isTrue();
     }
 
     private static Hub createHub() {

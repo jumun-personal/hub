@@ -33,16 +33,16 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class OutboxServiceTest {
+public class OutboxPublicationServiceTest {
 
     @Mock
     private KafkaTemplate<String, String> kafkaTemplate;
 
     @Mock
-    private OutboxRepository outboxRepository;
+    private JpaOutboxRepository outboxRepository;
 
     @Mock
-    private OutboxClaimService outboxClaimService;
+    private OutboxStateTransitions outboxStateTransitions;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -51,7 +51,7 @@ public class OutboxServiceTest {
     private OutboxDispatcher outboxDispatcher;
 
     @InjectMocks
-    private OutboxService outboxService;
+    private OutboxPublicationService outboxService;
 
     @Test
     @DisplayName("HubCreatedEvent를 저장할 수 있다.")
@@ -63,7 +63,7 @@ public class OutboxServiceTest {
         given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
 
         //when
-        outboxService.save(event);
+        outboxService.append(event);
 
         //then
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
@@ -86,7 +86,7 @@ public class OutboxServiceTest {
         given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
 
         //when
-        outboxService.save(event);
+        outboxService.append(event);
 
         //then
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
@@ -107,7 +107,7 @@ public class OutboxServiceTest {
                 .willThrow(new JsonProcessingException("Serialization error") {});
 
         //when & then
-        assertThatThrownBy(() -> outboxService.save(event))
+        assertThatThrownBy(() -> outboxService.append(event))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Failed to serialize event payload");
     }
@@ -121,13 +121,13 @@ public class OutboxServiceTest {
         doAnswer(invocation -> {
             event.publishSuccess();
             return null;
-        }).when(outboxClaimService).markPublishSuccess(event);
+        }).when(outboxStateTransitions).markPublishSuccess(event);
 
         //when
         OutboxEvent outboxEvent = outboxService.publishClaimedEvent(event);
 
         //then
-        then(outboxClaimService).should().markPublishSuccess(event);
+        then(outboxStateTransitions).should().markPublishSuccess(event);
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
     }
 
@@ -139,12 +139,17 @@ public class OutboxServiceTest {
         event.incrementRetryCount();
         event.incrementRetryCount();
         event.incrementRetryCount();
+        doAnswer(invocation -> {
+            event.markDead("Max retry count exceeded");
+            return null;
+        }).when(outboxStateTransitions).markPublishDead(event, "Max retry count exceeded");
 
         //when
         outboxService.publishClaimedEvent(event);
 
         //then
         then(kafkaTemplate).should(never()).send(anyString(), anyString());
+        then(outboxStateTransitions).should().markPublishDead(event, "Max retry count exceeded");
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(event.getErrorMessage()).isEqualTo("Max retry count exceeded");
     }
@@ -158,13 +163,13 @@ public class OutboxServiceTest {
         doAnswer(invocation -> {
             event.publishFail("에러");
             return null;
-        }).when(outboxClaimService).markPublishFailure(event, "에러");
+        }).when(outboxStateTransitions).markPublishFailure(event, "에러");
 
         //when
         OutboxEvent outboxEvent = outboxService.publishClaimedEvent(event);
 
         //then
-        then(outboxClaimService).should().markPublishFailure(event, "에러");
+        then(outboxStateTransitions).should().markPublishFailure(event, "에러");
         assertThat(outboxEvent.getRetryCount()).isEqualTo(1);
         assertThat(outboxEvent.getErrorMessage()).isEqualTo("에러");
     }
@@ -175,7 +180,7 @@ public class OutboxServiceTest {
         // given
         String eventKey = "test-key";
         OutboxEvent event = createOutboxEvent();
-        given(outboxClaimService.claimByEventKey(eq(eventKey), any(LocalDateTime.class)))
+        given(outboxStateTransitions.claimByEventKey(eq(eventKey), any(LocalDateTime.class)))
                 .willReturn(Optional.of(event));
 
         // when
@@ -190,7 +195,7 @@ public class OutboxServiceTest {
     void publishAfterCommit_WhenClaimFails_skipsPublish() {
         // given
         String eventKey = "test-key";
-        given(outboxClaimService.claimByEventKey(eq(eventKey), any(LocalDateTime.class)))
+        given(outboxStateTransitions.claimByEventKey(eq(eventKey), any(LocalDateTime.class)))
                 .willReturn(Optional.empty());
 
         // when
@@ -198,21 +203,6 @@ public class OutboxServiceTest {
 
         // then
         then(outboxDispatcher).should(never()).dispatch(any());
-    }
-
-    @Test
-    @DisplayName("이벤트를 완료 상태로 표시할 수 있다.")
-    void markAsProcessed_success() {
-        //given
-        String eventKey = "test-key";
-        OutboxEvent event = createOutboxEvent();
-        given(outboxRepository.findByEventKey(eventKey)).willReturn(event);
-
-        //when
-        outboxService.markAsProcessed(eventKey);
-
-        //then
-        assertThat(event.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
     }
 
     @Test
@@ -224,26 +214,10 @@ public class OutboxServiceTest {
                 .willReturn(10);
 
         //when
-        int deletedCount = outboxService.cleanUp(cutoff);
+        int deletedCount = outboxService.cleanupCompletedBefore(cutoff);
 
         //then
         assertThat(deletedCount).isEqualTo(10);
-    }
-
-    @Test
-    @DisplayName("PENDING 상태의 이벤트 100개를 조회할 수 있다.")
-    void findTop100ByStatusOrderByIdAsc_success() {
-        //given
-        List<OutboxEvent> expectedEvents = List.of(createOutboxEvent());
-        given(outboxRepository.findTop100ByStatusOrderByIdAsc(OutboxStatus.PENDING))
-                .willReturn(expectedEvents);
-
-        //when
-        List<OutboxEvent> events = outboxService.findTop100ByStatusOrderByIdAsc(OutboxStatus.PENDING);
-
-        //then
-        assertThat(events).hasSize(1);
-        assertThat(events).isEqualTo(expectedEvents);
     }
 
     @Test
@@ -252,10 +226,10 @@ public class OutboxServiceTest {
         // given
         LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(5);
         OutboxEvent event = createOutboxEvent();
-        given(outboxClaimService.claimPublishableEvents(staleBefore)).willReturn(List.of(event));
+        given(outboxStateTransitions.claimPublishableEvents(staleBefore)).willReturn(List.of(event));
 
         // when
-        outboxService.processClaimableEvents(staleBefore);
+        outboxService.publishPending(staleBefore);
 
         // then
         then(outboxDispatcher).should().dispatch(event);

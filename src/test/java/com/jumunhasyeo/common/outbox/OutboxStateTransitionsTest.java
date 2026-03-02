@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.infrastructure.outbox;
 
+import com.jumunhasyeo.hub.hub.application.HubCreationOutboxFailureHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,13 +17,16 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
-class OutboxClaimServiceTest {
+class OutboxStateTransitionsTest {
 
     @Mock
-    private OutboxRepository outboxRepository;
+    private JpaOutboxRepository outboxRepository;
+
+    @Mock
+    private HubCreationOutboxFailureHandler terminalFailureHandler;
 
     @InjectMocks
-    private OutboxClaimService outboxClaimService;
+    private OutboxStateTransitions outboxStateTransitions;
 
     @Test
     @DisplayName("eventKey로 클레임하면 이벤트가 PROCESSING 상태가 된다.")
@@ -31,11 +35,17 @@ class OutboxClaimServiceTest {
         String eventKey = "event-key";
         LocalDateTime staleBefore = LocalDateTime.of(2026, 6, 25, 10, 0);
         OutboxEvent event = createOutboxEvent(eventKey);
-        given(outboxRepository.findClaimableByEventKeyForUpdateSkipLocked(eventKey, staleBefore))
+        given(outboxRepository.findClaimableByEventKeyForUpdateSkipLocked(
+                eventKey,
+                OutboxStatus.PENDING.name(),
+                OutboxStatus.FAILED.name(),
+                OutboxStatus.PROCESSING.name(),
+                staleBefore
+        ))
                 .willReturn(Optional.of(event));
 
         // when
-        Optional<OutboxEvent> result = outboxClaimService.claimByEventKey(eventKey, staleBefore);
+        Optional<OutboxEvent> result = outboxStateTransitions.claimByEventKey(eventKey, staleBefore);
 
         // then
         assertThat(result).contains(event);
@@ -51,11 +61,16 @@ class OutboxClaimServiceTest {
         LocalDateTime staleBefore = LocalDateTime.of(2026, 6, 25, 10, 0);
         OutboxEvent event1 = createOutboxEvent("event-key-1");
         OutboxEvent event2 = createOutboxEvent("event-key-2");
-        given(outboxRepository.findTop100ClaimableForUpdateSkipLocked(staleBefore))
+        given(outboxRepository.findTop100ClaimableForUpdateSkipLocked(
+                OutboxStatus.PENDING.name(),
+                OutboxStatus.FAILED.name(),
+                OutboxStatus.PROCESSING.name(),
+                staleBefore
+        ))
                 .willReturn(List.of(event1, event2));
 
         // when
-        List<OutboxEvent> result = outboxClaimService.claimPublishableEvents(staleBefore);
+        List<OutboxEvent> result = outboxStateTransitions.claimPublishableEvents(staleBefore);
 
         // then
         assertThat(result).containsExactly(event1, event2);
@@ -73,7 +88,7 @@ class OutboxClaimServiceTest {
         event.claimProcessing();
 
         // when
-        outboxClaimService.markPublishSuccess(event);
+        outboxStateTransitions.markPublishSuccess(event);
 
         // then
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.COMPLETE);
@@ -88,7 +103,7 @@ class OutboxClaimServiceTest {
         OutboxEvent event = createOutboxEvent("event-key");
 
         // when
-        outboxClaimService.markPublishFailure(event, "publish failed");
+        outboxStateTransitions.markPublishFailure(event, "publish failed");
 
         // then
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.FAILED);
@@ -105,12 +120,13 @@ class OutboxClaimServiceTest {
         event.incrementRetryCount();
 
         // when
-        outboxClaimService.markPublishFailure(event, "publish failed");
+        outboxStateTransitions.markPublishFailure(event, "publish failed");
 
         // then
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(event.getRetryCount()).isEqualTo(3);
         then(outboxRepository).should().save(event);
+        then(terminalFailureHandler).should().handle(event);
     }
 
     private static OutboxEvent createOutboxEvent(String eventKey) {

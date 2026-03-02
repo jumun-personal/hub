@@ -1,5 +1,6 @@
 package com.jumunhasyeo.hub.infrastructure.outbox;
 
+import com.jumunhasyeo.hub.hub.application.HubCreationOutboxFailureHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,14 +11,18 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class OutboxClaimService {
+class OutboxStateTransitions {
 
-    private final OutboxRepository outboxRepository;
+    private final JpaOutboxRepository outboxRepository;
+    private final HubCreationOutboxFailureHandler terminalFailureHandler;
 
     @Transactional
     public Optional<OutboxEvent> claimByEventKey(String eventKey, LocalDateTime staleBefore) {
         Optional<OutboxEvent> outboxEvent = outboxRepository.findClaimableByEventKeyForUpdateSkipLocked(
                 eventKey,
+                OutboxStatus.PENDING.name(),
+                OutboxStatus.FAILED.name(),
+                OutboxStatus.PROCESSING.name(),
                 staleBefore
         );
         outboxEvent.ifPresent(event -> {
@@ -29,7 +34,12 @@ public class OutboxClaimService {
 
     @Transactional
     public List<OutboxEvent> claimPublishableEvents(LocalDateTime staleBefore) {
-        List<OutboxEvent> events = outboxRepository.findTop100ClaimableForUpdateSkipLocked(staleBefore);
+        List<OutboxEvent> events = outboxRepository.findTop100ClaimableForUpdateSkipLocked(
+                OutboxStatus.PENDING.name(),
+                OutboxStatus.FAILED.name(),
+                OutboxStatus.PROCESSING.name(),
+                staleBefore
+        );
         for (OutboxEvent event : events) {
             event.claimProcessing();
             outboxRepository.save(event);
@@ -47,5 +57,15 @@ public class OutboxClaimService {
     public void markPublishFailure(OutboxEvent event, String errorMessage) {
         event.publishFail(errorMessage);
         outboxRepository.save(event);
+        if (event.getStatus() == OutboxStatus.DEAD) {
+            terminalFailureHandler.handle(event);
+        }
+    }
+
+    @Transactional
+    public void markPublishDead(OutboxEvent event, String errorMessage) {
+        event.markDead(errorMessage);
+        outboxRepository.save(event);
+        terminalFailureHandler.handle(event);
     }
 }

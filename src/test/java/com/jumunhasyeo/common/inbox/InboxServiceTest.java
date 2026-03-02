@@ -186,6 +186,24 @@ public class InboxServiceTest {
     }
 
     @Test
+    @DisplayName("원본 재고 차감 이력이 늦게 도착하면 Inbox 이벤트를 재시도 상태로 유지한다.")
+    void inboxProcess_WhenDecreaseHistoryHasNotArrived_keepsEventRetryable() {
+        // given
+        InboxEvent event = createInboxEvent();
+        doThrow(new BusinessException(ErrorCode.NOT_FOUND_EXCEPTION, "원본 재고 감소 이력이 아직 없습니다."))
+                .when(inboxDispatcher).dispatch(event);
+
+        // when
+        inboxService.inboxProcess(event);
+
+        // then
+        then(inboxRepository).should(times(2)).save(event);
+        assertThat(event.getStatus()).isEqualTo(InboxStatus.RECEIVED);
+        assertThat(event.getRetryCount()).isEqualTo(1);
+        assertThat(event.getErrorMessage()).contains("원본 재고 감소 이력이 아직 없습니다.");
+    }
+
+    @Test
     @DisplayName("재시도 불가능한 BusinessException 발생 시 FAILED 처리된다.")
     void inboxProcess_WhenNonRetryableBusinessException_marksFailed() {
         //given
