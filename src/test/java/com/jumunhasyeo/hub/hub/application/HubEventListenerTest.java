@@ -1,6 +1,6 @@
 package com.jumunhasyeo.hub.hub.application;
 
-import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxPublicationService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
@@ -24,7 +24,7 @@ import static org.mockito.BDDMockito.then;
 class HubEventListenerTest {
 
     @Mock
-    private OutboxService outboxService;
+    private OutboxPublicationService outboxPublicationService;
 
     @InjectMocks
     private HubEventListener hubEventListener;
@@ -36,7 +36,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -46,7 +46,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -56,7 +56,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -66,7 +66,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -76,7 +76,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
@@ -86,7 +86,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
@@ -96,7 +96,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
@@ -106,7 +106,7 @@ class HubEventListenerTest {
 
         hubEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     private static Hub createHub() {

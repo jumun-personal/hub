@@ -25,7 +25,8 @@ import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORD
 public class InboxService {
     private static final Set<ErrorCode> RETRYABLE_BUSINESS_ERRORS = Set.of(
             ErrorCode.PROCESSING_CONFLICT_EXCEPTION,
-            ErrorCode.INTERNAL_SERVER_ERROR
+            ErrorCode.INTERNAL_SERVER_ERROR,
+            ErrorCode.NOT_FOUND_EXCEPTION
     );
 
     private final InboxRepository inboxRepository;

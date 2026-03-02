@@ -1,6 +1,6 @@
 package com.jumunhasyeo.hub.hubRoute.application;
 
-import com.jumunhasyeo.hub.infrastructure.outbox.OutboxService;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxPublicationService;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -26,7 +26,7 @@ import static org.mockito.BDDMockito.then;
 class HubRouteSpringEventListenerTest {
 
     @Mock
-    private OutboxService outboxService;
+    private OutboxPublicationService outboxPublicationService;
 
     @InjectMocks
     private HubRouteSpringEventListener hubRouteSpringEventListener;
@@ -38,7 +38,7 @@ class HubRouteSpringEventListenerTest {
 
         hubRouteSpringEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -48,7 +48,7 @@ class HubRouteSpringEventListenerTest {
 
         hubRouteSpringEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -58,7 +58,7 @@ class HubRouteSpringEventListenerTest {
 
         hubRouteSpringEventListener.handleBeforeCommit(event);
 
-        then(outboxService).should().save(event);
+        then(outboxPublicationService).should().append(event);
     }
 
     @Test
@@ -68,7 +68,7 @@ class HubRouteSpringEventListenerTest {
 
         hubRouteSpringEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
@@ -78,7 +78,7 @@ class HubRouteSpringEventListenerTest {
 
         hubRouteSpringEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     @Test
@@ -88,7 +88,7 @@ class HubRouteSpringEventListenerTest {
 
         hubRouteSpringEventListener.handleAfterCommit(event);
 
-        then(outboxService).should().publishAfterCommit(event.getEventKey());
+        then(outboxPublicationService).should().publishAfterCommit(event.getEventKey());
     }
 
     private static HubRouteCreatedEvent createHubRouteCreatedEvent() {
