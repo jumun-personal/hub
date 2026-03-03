@@ -17,3 +17,10 @@ hub:
     build:
       scheduler:
         enabled: false
+
+stock:
+  events:
+    enabled: true
+  inbox:
+    scheduler:
+      enabled: true
