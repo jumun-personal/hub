@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -17,6 +18,7 @@ import static com.jumunhasyeo.stock.infrastructure.event.ListenEventRegistry.ORD
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "stock.events.enabled", havingValue = "true", matchIfMissing = true)
 public class KafkaStockEventListener {
     private final OrderCompensateHandler orderCompensateHandler;
     private final ObjectMapper objectMapper;
