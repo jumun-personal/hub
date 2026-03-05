@@ -30,8 +30,10 @@ flowchart LR
   Kafka로 발행합니다.
 - 발행 실패 이벤트는 Scheduler가 재시도하며, `event_key` UNIQUE 제약으로
   중복 저장을 방지합니다.
-- 지도 API 100회·호출당 2,050ms 고정 지연 조건에서 Hub 생성 API 응답시간을
-  `206,535ms → 12ms`로 단축했습니다. `12ms`는 Hub와 Outbox 저장까지의 시간입니다.
+- 기존 지점 100개·경로쌍 101개·호출당 2,050ms 고정 지연 조건에서 Hub 생성 요청 구간을
+  1회 재측정 기준 `208,999ms → 24ms`로 단축했습니다. `24ms`는 실제 HTTP 요청이
+  아니라 측정 Harness에서 Hub와 Outbox 저장까지의 시간이며, 원본과 한계는
+  [`benchmark/README.md`](benchmark/README.md)에 있습니다.
 
 ### Route Worker 프로세스 격리
 
@@ -50,7 +52,8 @@ SPRING_PROFILES_ACTIVE=dev,route-worker ./gradlew bootRun
 - `ON CONFLICT DO NOTHING`과 UNIQUE 제약으로 Kafka 중복 소비에 의한 중복
   경로를 방지합니다.
 - 경로 200건을 단일 Transaction과 JDBC `executeBatch()`로 저장해
-  `235.1ms → 118.8ms → 9.97ms`로 단축했습니다.
+  로컬 Docker 재측정 중앙값 기준 `285.098ms → 121.776ms → 11.277ms`로
+  단축했습니다. 실행 조건과 원본 결과는 [`benchmark/README.md`](benchmark/README.md)에 있습니다.
 
 ### 외부 지도 API 장애 대응
 

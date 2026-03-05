@@ -1,0 +1,19 @@
+host=Darwin 25.5.0 arm64
+java=Oracle GraalVM 21+35.1
+docker_server=27.4.0
+postgres=postgres:16-alpine
+command=JAVA_TOOL_OPTIONS='-DhubRoute.measurement.apiLatencyMs=2050 -DhubRoute.measurement.runs=1' HUB_ROUTE_MEASUREMENT_POSTGRES=true ./gradlew test --tests com.jumunhasyeo.hub.hub.application.HubCreateAsyncSeparationMeasurementTest --rerun-tasks
+
+condition existingBranches=100 routePairs=101 directedRouteRows=202 apiLatencyMs=2050 runs=1
+apiMode=simulated-fixed-latency
+Before(sync request): sync-request elapsedMs=208,999 routeRows=202 outboxRows=0 apiCalls=101 kakaoCalls=0 naverCalls=0
+After(async request): async-request elapsedMs=24 routeRows=0 outboxRows=1 apiCalls=0 kakaoCalls=0 naverCalls=0
+Async skeleton consumer: skeleton-consumer elapsedMs=149 routeRows=202 outboxRows=0 apiCalls=0 kakaoCalls=0 naverCalls=0
+Request reduction: 208,999ms -> 24ms
+Request plus async skeleton comparison: 208,999ms -> 173ms
+
+limitations:
+- fixed-delay provider adapter, not a real map provider
+- direct measurement harness, not an HTTP endpoint
+- after value ends when Hub and Outbox persistence completes
+- one measurement round; no p95 is claimed
