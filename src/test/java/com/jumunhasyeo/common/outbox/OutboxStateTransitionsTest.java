@@ -126,7 +126,7 @@ class OutboxStateTransitionsTest {
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.DEAD);
         assertThat(event.getRetryCount()).isEqualTo(3);
         then(outboxRepository).should().save(event);
-        then(terminalFailureHandler).should().handle(event);
+        then(terminalFailureHandler).shouldHaveNoInteractions();
     }
 
     private static OutboxEvent createOutboxEvent(String eventKey) {

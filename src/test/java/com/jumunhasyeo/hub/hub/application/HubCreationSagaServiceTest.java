@@ -2,6 +2,7 @@ package com.jumunhasyeo.hub.hub.application;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
+import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRelationRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -51,8 +53,8 @@ class HubCreationSagaServiceTest {
     }
 
     @Test
-    @DisplayName("허브 경로 생성 완료는 PENDING 상태일 때만 COMPLETE로 전이한다")
-    void complete_whenPendingTransitionSucceeded_marksCompleteOnly() {
+    @DisplayName("허브 경로 생성 완료는 Hub를 COMPLETE로 전이하고 HubCreatedEvent를 발행한다")
+    void complete_whenPendingTransitionSucceeded_publishesCreatedEvent() {
         // given
         UUID hubId = UUID.randomUUID();
         Hub hub = createHub(hubId);
@@ -65,7 +67,11 @@ class HubCreationSagaServiceTest {
         // then
         then(hubRepository).should().completeIfPending(hubId);
         then(hubRelationRepository).shouldHaveNoInteractions();
-        then(hubEventPublisher).shouldHaveNoInteractions();
+        ArgumentCaptor<HubCreatedEvent> eventCaptor = ArgumentCaptor.forClass(HubCreatedEvent.class);
+        then(hubEventPublisher).should().publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getHubId()).isEqualTo(hubId);
+        assertThat(eventCaptor.getValue().getCenterHubId()).isNull();
+        assertThat(eventCaptor.getValue().eventKey()).isEqualTo("HubCreatedEvent:" + hubId);
     }
 
     @Test
@@ -82,6 +88,94 @@ class HubCreationSagaServiceTest {
 
         // then
         then(hubRepository).should().completeIfPending(hubId);
+        then(hubRelationRepository).shouldHaveNoInteractions();
+        then(hubEventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("지점 허브 경로 생성 완료 이벤트에는 중앙 허브 ID가 포함된다")
+    void complete_branchHub_publishesCreatedEventWithCenterHubId() {
+        // given
+        UUID centerHubId = UUID.randomUUID();
+        Hub centerHub = createHub(centerHubId);
+        centerHub.activate();
+        UUID branchHubId = UUID.randomUUID();
+        Hub branchHub = Hub.builder()
+                .hubId(branchHubId)
+                .name("테스트 지점 허브")
+                .hubType(HubType.BRANCH)
+                .address(Address.of("서울시 강남구", Coordinate.of(37.4, 127.0)))
+                .build();
+        branchHub.addCenterHub(centerHub);
+        given(hubRepository.findByIdIncludingDeleted(branchHubId)).willReturn(Optional.of(branchHub));
+        given(hubRepository.completeIfPending(branchHubId)).willReturn(1);
+
+        // when
+        hubCreationSagaService.complete(branchHubId);
+
+        // then
+        ArgumentCaptor<HubCreatedEvent> eventCaptor = ArgumentCaptor.forClass(HubCreatedEvent.class);
+        then(hubEventPublisher).should().publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getHubId()).isEqualTo(branchHubId);
+        assertThat(eventCaptor.getValue().getCenterHubId()).isEqualTo(centerHubId);
+    }
+
+    @Test
+    @DisplayName("전체 경로 구축 실패는 Hub를 FAILED로 전환하고 삭제 후속 처리를 수행하지 않는다")
+    void failRouteBuild_whenPendingTransitionSucceeded_doesNotDeleteOrPublishEvent() {
+        // given
+        UUID hubId = UUID.randomUUID();
+        given(hubRepository.failRouteBuildIfPending(hubId)).willReturn(1);
+
+        // when
+        hubCreationSagaService.failRouteBuild(hubId, "route build failed");
+
+        // then
+        then(hubRepository).should().failRouteBuildIfPending(hubId);
+        then(hubRelationRepository).shouldHaveNoInteractions();
+        then(hubEventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("전체 경로 구축 실패 상태 전이가 충돌하면 예외를 반환한다")
+    void failRouteBuild_whenTransitionConflicts_throwsException() {
+        // given
+        UUID hubId = UUID.randomUUID();
+        given(hubRepository.failRouteBuildIfPending(hubId)).willReturn(0);
+
+        // when & then
+        assertThatThrownBy(() -> hubCreationSagaService.failRouteBuild(hubId, "route build failed"))
+                .isInstanceOf(com.jumunhasyeo.common.exception.BusinessException.class);
+        then(hubRelationRepository).shouldHaveNoInteractions();
+        then(hubEventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("운영자 재시도는 Hub를 FAILED에서 PENDING으로 전환하고 이벤트를 발행하지 않는다")
+    void retryRouteBuild_whenFailedTransitionSucceeded_doesNotPublishEvent() {
+        // given
+        UUID hubId = UUID.randomUUID();
+        given(hubRepository.retryRouteBuildIfFailed(hubId)).willReturn(1);
+
+        // when
+        hubCreationSagaService.retryRouteBuild(hubId);
+
+        // then
+        then(hubRepository).should().retryRouteBuildIfFailed(hubId);
+        then(hubRelationRepository).shouldHaveNoInteractions();
+        then(hubEventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("FAILED가 아닌 Hub의 경로 구축 재시도는 예외를 반환한다")
+    void retryRouteBuild_whenTransitionConflicts_throwsException() {
+        // given
+        UUID hubId = UUID.randomUUID();
+        given(hubRepository.retryRouteBuildIfFailed(hubId)).willReturn(0);
+
+        // when & then
+        assertThatThrownBy(() -> hubCreationSagaService.retryRouteBuild(hubId))
+                .isInstanceOf(com.jumunhasyeo.common.exception.BusinessException.class);
         then(hubRelationRepository).shouldHaveNoInteractions();
         then(hubEventPublisher).shouldHaveNoInteractions();
     }

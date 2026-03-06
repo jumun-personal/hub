@@ -9,21 +9,16 @@ import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
 import com.jumunhasyeo.hub.hubRoute.domain.service.HubRouteDomainService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.convert.DurationStyle;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,32 +36,38 @@ public class HubRouteService {
     private final HubRouteDomainService hubRouteDomainService;
     private final HubRouteEventPublisher hubRouteEventPublisher;
 
-    @Value("${hub.route.build.event-recovery-delay:5m}")
-    private String eventRecoveryDelay;
-
     /**
      * 새로운 Hub 생성 시 경로 자동 생성
      */
     @Transactional
     public void buildRoutesForNewHub(BuildRouteCommand command) {
-        Set<HubRoute> hubRoutes = new HashSet<>();
-        HubType type = command.type();
-        if (type == HubType.CENTER) {
-            hubRoutes.addAll(buildForCenter(command));
-        } else if (type == HubType.BRANCH) {
-            hubRoutes.addAll(buildForBranch(command));
-        }
+        prepareRoutesForBuildJob(command.hubId());
+    }
 
-        if (!hubRoutes.isEmpty()) {
-            hubRouteEventPublisher.publishRouteBuildRequested(toBuildRequestedEvents(command.hubId(), hubRoutes));
-        } else if (!hubRouteRepository.hasIncompleteRoutes(command.hubId())) {
-            hubRouteEventPublisher.publishRouteBuildCompleted(command);
+    @Transactional
+    public int prepareRoutesForBuildJob(UUID hubId) {
+        Hub hub = getHubIncludingCreating(hubId);
+        Set<HubRoute> hubRoutes = new HashSet<>();
+        if (hub.isCenterHub()) {
+            hubRoutes.addAll(buildForCenter(hub));
+        } else if (hub.isBranchHub()) {
+            hubRoutes.addAll(buildForBranch(hub));
         }
+        return countRoutePairs(hubRoutes);
     }
 
     public List<UUID> findRouteBuildRecoveryTargets(int batchSize, Duration staleProcessingTimeout) {
         LocalDateTime now = LocalDateTime.now();
         return hubRouteRepository.findRecoveryTargetIds(
+                batchSize,
+                now,
+                now.minus(staleProcessingTimeout)
+        );
+    }
+
+    public List<UUID> findRunningJobBuildTargets(int batchSize, Duration staleProcessingTimeout) {
+        LocalDateTime now = LocalDateTime.now();
+        return hubRouteRepository.findRunningJobBuildTargetIds(
                 batchSize,
                 now,
                 now.minus(staleProcessingTimeout)
@@ -90,8 +91,11 @@ public class HubRouteService {
         return hubRouteRepository.hasActiveBuildWork();
     }
 
-    private Set<HubRoute> buildForCenter(BuildRouteCommand command) {
-        Hub newCenterHub = getHubIncludingCreating(command.hubId());
+    public int resetFailedBuildRoutes(UUID buildHubId) {
+        return hubRouteRepository.resetFailedBuildRoutes(buildHubId);
+    }
+
+    private Set<HubRoute> buildForCenter(Hub newCenterHub) {
         List<Hub> existingCenterHubs = hubRepository.findAllByHubType(HubType.CENTER)
                 .stream()
                 .filter(hub -> !hub.getHubId().equals(newCenterHub.getHubId()))
@@ -99,30 +103,29 @@ public class HubRouteService {
         Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(newCenterHub);
 
         Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewCenterHub(
-                command.hubId(),
+                newCenterHub.getHubId(),
                 newCenterHub,
                 existingCenterHubs
         );
-        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
-        scheduleEventRecovery(filteredRoutes);
-
+        Set<HubRoute> filteredRoutes = filterBuildableRoutes(newCenterHub, filterMissingRoutes(routes, existingRouteMap));
         Set<UUID> insertedRouteIds = hubRouteRepository.insertIgnore(filteredRoutes);
         return filterInsertedRoutes(filteredRoutes, insertedRouteIds);
     }
 
-    private Set<HubRoute> buildForBranch(BuildRouteCommand command) {
-        Hub branchHub = getHubIncludingCreating(command.hubId());
-        Hub centerHub = getHub(command.centerHubId());
+    private Set<HubRoute> buildForBranch(Hub branchHub) {
+        Hub centerHub = branchHub.getCenterHubs()
+                .stream()
+                .filter(Hub::isActive)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.BRANCH_NOT_CONNECTED_TO_CENTER));
         Map<RouteKey, HubRoute> existingRouteMap = getExistingRouteMap(branchHub);
 
         Set<HubRoute> routes = hubRouteDomainService.buildRouteSkeletonsForNewBranchHub(
-                command.hubId(),
+                branchHub.getHubId(),
                 branchHub,
                 centerHub
         );
-        Set<HubRoute> filteredRoutes = filterMissingRoutes(routes, existingRouteMap);
-        scheduleEventRecovery(filteredRoutes);
-
+        Set<HubRoute> filteredRoutes = filterBuildableRoutes(branchHub, filterMissingRoutes(routes, existingRouteMap));
         Set<UUID> insertedRouteIds = hubRouteRepository.insertIgnore(filteredRoutes);
         return filterInsertedRoutes(filteredRoutes, insertedRouteIds);
     }
@@ -141,6 +144,17 @@ public class HubRouteService {
         return routes.stream()
                 .filter(route -> !existingRouteMap.containsKey(routeKey(route.getStartHub(), route.getEndHub())))
                 .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private Set<HubRoute> filterBuildableRoutes(Hub buildHub, Set<HubRoute> routes) {
+        return routes.stream()
+                .filter(route -> isBuildEndpoint(buildHub, route.getStartHub()))
+                .filter(route -> isBuildEndpoint(buildHub, route.getEndHub()))
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private boolean isBuildEndpoint(Hub buildHub, Hub endpoint) {
+        return endpoint.getHubId().equals(buildHub.getHubId()) || endpoint.isActive();
     }
 
     private Hub getHub(UUID hubId) {
@@ -167,55 +181,13 @@ public class HubRouteService {
                 .collect(Collectors.toCollection(HashSet::new));
     }
 
-    private void scheduleEventRecovery(Set<HubRoute> routes) {
-        LocalDateTime recoveryAt = LocalDateTime.now().plus(eventRecoveryDelay());
-        routes.forEach(route -> route.scheduleRecovery(recoveryAt));
-    }
-
-    private Duration eventRecoveryDelay() {
-        return DurationStyle.detectAndParse(
-                eventRecoveryDelay == null || eventRecoveryDelay.isBlank() ? "5m" : eventRecoveryDelay
-        );
-    }
-
-    private List<HubRouteBuildRequestedEvent> toBuildRequestedEvents(UUID hubId, Set<HubRoute> routes) {
-        Map<RoutePairKey, List<HubRoute>> routePairs = routes.stream()
-                .collect(Collectors.groupingBy(route -> RoutePairKey.of(
-                        route.getStartHub().getHubId(),
-                        route.getEndHub().getHubId()
-                )));
-
-        List<HubRouteBuildRequestedEvent> events = new ArrayList<>();
-        for (List<HubRoute> pair : routePairs.values()) {
-            List<UUID> routeIds = pair.stream()
-                    .map(HubRoute::getRouteId)
-                    .sorted(Comparator.comparing(UUID::toString))
-                    .toList();
-            events.add(new HubRouteBuildRequestedEvent(hubId, routeIds));
-        }
-        return events;
-    }
-
     /**
      * 허브 삭제 시 해당 허브와 연결된 모든 경로 소프트 삭제
      */
     @Transactional
     public void deleteRoutesForHub(UUID hubId, Long deletedBy) {
-        Hub hub = getHubIncludingDeleted(hubId);
-        List<HubRoute> routes = hubRouteRepository.findByStartHubOrEndHub(hub, hub);
-
-        if (routes.isEmpty()) {
-            log.info("No routes found for hub: {}", hub.getName());
-            return;
-        }
-
-        routes.forEach(route -> route.markDeleted(deletedBy));
-        hubRouteRepository.saveAll(routes);
-
-        List<HubRouteDeletedEvent> deleteEvents = routes.stream()
-                .map(HubRouteDeletedEvent::from)
-                .collect(Collectors.toList());
-        hubRouteEventPublisher.publishRouteDeletedEvent(deleteEvents);
+        int deletedCount = hubRouteRepository.bulkSoftDeleteByHubId(hubId, deletedBy);
+        log.info("Hub routes soft deleted. hubId={}, count={}", hubId, deletedCount);
     }
 
     public List<HubRouteRes> getALLRoute() {
@@ -229,14 +201,24 @@ public class HubRouteService {
         return new RouteKey(startHub.getHubId(), endHub.getHubId());
     }
 
+    private int countRoutePairs(Set<HubRoute> routes) {
+        return (int) routes.stream()
+                .map(route -> routePairKey(route.getStartHub(), route.getEndHub()))
+                .distinct()
+                .count();
+    }
+
+    private RoutePairKey routePairKey(Hub startHub, Hub endHub) {
+        UUID startHubId = startHub.getHubId();
+        UUID endHubId = endHub.getHubId();
+        return startHubId.compareTo(endHubId) <= 0
+                ? new RoutePairKey(startHubId, endHubId)
+                : new RoutePairKey(endHubId, startHubId);
+    }
+
     private record RouteKey(UUID startHubId, UUID endHubId) {
     }
 
     private record RoutePairKey(UUID firstHubId, UUID secondHubId) {
-        private static RoutePairKey of(UUID first, UUID second) {
-            return first.toString().compareTo(second.toString()) <= 0
-                    ? new RoutePairKey(first, second)
-                    : new RoutePairKey(second, first);
-        }
     }
 }

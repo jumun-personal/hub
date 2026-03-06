@@ -7,7 +7,6 @@ import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -127,6 +126,11 @@ public class AdapterHubRouteRepository implements HubRouteRepository {
     }
 
     @Override
+    public List<UUID> findRunningJobBuildTargetIds(int limit, LocalDateTime now, LocalDateTime staleBefore) {
+        return repository.findRunningJobBuildTargetIds(limit, now, staleBefore);
+    }
+
+    @Override
     public List<UUID> findRefreshTargetIds(int limit, LocalDateTime now, LocalDateTime staleBefore) {
         return repository.findRefreshTargetIds(limit, now, staleBefore);
     }
@@ -142,19 +146,6 @@ public class AdapterHubRouteRepository implements HubRouteRepository {
     }
 
     @Override
-    public void lockBuildHub(UUID buildHubId) {
-        jdbcTemplate.execute((ConnectionCallback<Void>) connection -> {
-            try (var statement = connection.prepareStatement(
-                    "SELECT pg_advisory_xact_lock(hashtextextended(CAST(? AS text), 0))"
-            )) {
-                statement.setObject(1, buildHubId);
-                statement.execute();
-                return null;
-            }
-        });
-    }
-
-    @Override
     public boolean hasActiveBuildWork() {
         return repository.existsActiveBuildWork();
     }
@@ -162,5 +153,25 @@ public class AdapterHubRouteRepository implements HubRouteRepository {
     @Override
     public boolean hasIncompleteRoutes(UUID buildHubId) {
         return repository.existsIncompleteByBuildHubId(buildHubId);
+    }
+
+    @Override
+    public boolean hasActiveBuildRoutes(UUID buildHubId) {
+        return repository.existsActiveByBuildHubId(buildHubId);
+    }
+
+    @Override
+    public boolean hasFailedBuildRoutes(UUID buildHubId) {
+        return repository.existsFailedByBuildHubId(buildHubId);
+    }
+
+    @Override
+    public int resetFailedBuildRoutes(UUID buildHubId) {
+        return repository.resetFailedBuildRoutes(buildHubId);
+    }
+
+    @Override
+    public int bulkSoftDeleteByHubId(UUID hubId, Long deletedBy) {
+        return repository.bulkSoftDeleteByHubId(hubId, deletedBy);
     }
 }

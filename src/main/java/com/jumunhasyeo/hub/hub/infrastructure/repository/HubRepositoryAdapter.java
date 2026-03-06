@@ -23,6 +23,11 @@ public class HubRepositoryAdapter implements HubRepository {
     }
 
     @Override
+    public void flush() {
+        jpaHubRepository.flush();
+    }
+
+    @Override
     public Optional<Hub> findById(UUID id) {
         return jpaHubRepository.findById(id, HubStatus.COMPLETE);
     }
@@ -63,6 +68,24 @@ public class HubRepositoryAdapter implements HubRepository {
                 hubId,
                 HubStatus.PENDING,
                 HubStatus.COMPLETE
+        );
+    }
+
+    @Override
+    public int failRouteBuildIfPending(UUID hubId) {
+        return jpaHubRepository.failRouteBuildIfPending(
+                hubId,
+                HubStatus.PENDING,
+                HubStatus.FAILED
+        );
+    }
+
+    @Override
+    public int retryRouteBuildIfFailed(UUID hubId) {
+        return jpaHubRepository.retryRouteBuildIfFailed(
+                hubId,
+                HubStatus.FAILED,
+                HubStatus.PENDING
         );
     }
 

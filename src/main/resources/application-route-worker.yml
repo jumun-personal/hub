@@ -11,14 +11,26 @@ hub:
   api:
     events:
       enabled: false
+  outbox:
+    scheduler:
+      enabled: false
   route:
+    events:
+      enabled: false
+    planning:
+      scheduler:
+        enabled: true
+      fixed-delay-ms: 500
+      stale-timeout: 5m
     worker:
-      enabled: true
+      enabled: false
     refresh:
-      enabled: true
+      enabled: false
     build:
       scheduler:
         enabled: true
+      batch-size: 2
+      fixed-delay-ms: 500
 
 stock:
   events:

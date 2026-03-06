@@ -78,11 +78,12 @@ class RouteWorkLifecycleTest {
         assertThat(queryCaptor.getValue().providerHint()).isEqualTo(ProviderHint.PRIMARY);
         then(routePairLifecycleService).should().completeRoutePairBuild(
                 org.mockito.ArgumentMatchers.eq(routeIds),
+                org.mockito.ArgumentMatchers.eq(target.processingToken()),
                 any(),
                 org.mockito.ArgumentMatchers.eq(RouteProvider.KAKAO),
                 org.mockito.ArgumentMatchers.eq(false)
         );
-        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
+        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(), any(Integer.class), any());
     }
 
     @Test
@@ -103,8 +104,8 @@ class RouteWorkLifecycleTest {
         processor.build(routeIds);
 
         // then
-        then(routePairLifecycleService).should().failRoutePairBuild(routeIds, "retry Kakao", 3, retryDelay);
-        then(routePairLifecycleService).should(never()).failRoutePairBuildPermanently(any(), any());
+        then(routePairLifecycleService).should().failRoutePairBuild(routeIds, target.processingToken(), "retry Kakao", 3, retryDelay);
+        then(routePairLifecycleService).should(never()).failRoutePairBuildPermanently(any(), any(), any());
     }
 
     @Test
@@ -128,6 +129,7 @@ class RouteWorkLifecycleTest {
         assertThat(queryCaptor.getValue().providerHint()).isEqualTo(ProviderHint.ANY);
         then(routePairLifecycleService).should().completeRoutePairBuild(
                 org.mockito.ArgumentMatchers.eq(routeIds),
+                org.mockito.ArgumentMatchers.eq(target.processingToken()),
                 any(),
                 org.mockito.ArgumentMatchers.eq(RouteProvider.NAVER),
                 org.mockito.ArgumentMatchers.eq(true)
@@ -153,10 +155,11 @@ class RouteWorkLifecycleTest {
         // then
         then(routePairLifecycleService).should().deferRoutePairBuild(
                 routeIds,
+                target.processingToken(),
                 "KAKAO route rate limit exhausted",
                 Duration.ofMillis(1200)
         );
-        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
+        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(), any(Integer.class), any());
     }
 
     @Test
@@ -178,11 +181,12 @@ class RouteWorkLifecycleTest {
         // then
         then(routePairLifecycleService).should().failRoutePairBuild(
                 routeIds,
+                target.processingToken(),
                 "providers down",
                 3,
                 retryDelay
         );
-        then(routePairLifecycleService).should(never()).failRoutePairBuildPermanently(any(), any());
+        then(routePairLifecycleService).should(never()).failRoutePairBuildPermanently(any(), any(), any());
     }
 
     @Test
@@ -200,8 +204,8 @@ class RouteWorkLifecycleTest {
         processor.build(routeIds);
 
         // then
-        then(routePairLifecycleService).should().failRoutePairBuildPermanently(routeIds, "invalid route");
-        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(Integer.class), any());
+        then(routePairLifecycleService).should().failRoutePairBuildPermanently(routeIds, target.processingToken(), "invalid route");
+        then(routePairLifecycleService).should(never()).failRoutePairBuild(any(), any(), any(), any(Integer.class), any());
     }
 
     private RoutePairBuildTarget target(List<UUID> routeIds) {
@@ -216,7 +220,8 @@ class RouteWorkLifecycleTest {
                 Coordinate.of(37.5, 127.0),
                 Coordinate.of(35.8, 128.6),
                 RoutePurpose.CENTER_TO_CENTER,
-                retryCount
+                retryCount,
+                UUID.randomUUID()
         );
     }
 }

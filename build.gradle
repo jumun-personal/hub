@@ -149,6 +149,49 @@ tasks.named('test') {
     environment 'SPRING_PROFILES_ACTIVE', 'test'
 }
 
+def registerHubCacheMeasurementTask = { String taskName, String testClass ->
+    tasks.register(taskName, Test) {
+        group = 'verification'
+        description = "허브 단건 조회 성능을 ${testClass.contains('Redis') ? 'Redis Cache-Aside' : '캐시 미적용'} 조건에서 측정합니다."
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform()
+        filter {
+            includeTestsMatching testClass
+        }
+        environment 'SPRING_PROFILES_ACTIVE', 'test'
+        systemProperty 'hubCache.measurement.enabled', 'true'
+        systemProperty 'hubCache.measurement.requests', project.findProperty('hubCacheRequests') ?: '3000'
+        systemProperty 'hubCache.measurement.concurrency', project.findProperty('hubCacheConcurrency') ?: '50'
+        systemProperty 'hubCache.measurement.warmupRequests', project.findProperty('hubCacheWarmupRequests') ?: '500'
+        systemProperty 'hubCache.measurement.rounds', project.findProperty('hubCacheRounds') ?: '5'
+        systemProperty 'test.jpa.showSql', 'false'
+        outputs.upToDateWhen { false }
+        testLogging {
+            events 'failed', 'skipped'
+            showStandardStreams = true
+        }
+    }
+}
+
+def hubCacheNoneMeasurement = registerHubCacheMeasurementTask(
+        'hubCacheNoneMeasurement',
+        'com.jumunhasyeo.hub.application.HubCacheNoneMeasurementTest'
+)
+def hubCacheRedisMeasurement = registerHubCacheMeasurementTask(
+        'hubCacheRedisMeasurement',
+        'com.jumunhasyeo.hub.application.HubCacheRedisMeasurementTest'
+)
+hubCacheRedisMeasurement.configure {
+    mustRunAfter hubCacheNoneMeasurement
+}
+
+tasks.register('hubCacheBenchmark') {
+    group = 'verification'
+    description = '캐시 미적용과 Redis Cache-Aside의 허브 단건 조회 성능을 독립 JVM에서 비교합니다.'
+    dependsOn hubCacheNoneMeasurement, hubCacheRedisMeasurement
+}
+
 jacoco {
     toolVersion = '0.8.12'
 }

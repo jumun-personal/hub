@@ -24,8 +24,14 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
     @Query("""
             SELECT hr
             FROM HubRoute hr
+            JOIN FETCH hr.startHub startHub
+            JOIN FETCH hr.endHub endHub
             WHERE hr.isDeleted = false
               AND (hr.status = com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.COMPLETE OR hr.status IS NULL)
+              AND startHub.status = com.jumunhasyeo.hub.hub.domain.entity.HubStatus.COMPLETE
+              AND endHub.status = com.jumunhasyeo.hub.hub.domain.entity.HubStatus.COMPLETE
+              AND startHub.isDeleted = false
+              AND endHub.isDeleted = false
             """)
     List<HubRoute> findAll();
 
@@ -117,6 +123,34 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
     );
 
     @Query(value = """
+            SELECT route.route_id
+            FROM p_hub_route route
+            JOIN p_hub_route_build_job job
+              ON job.hub_id = route.build_hub_id
+             AND job.status = 'RUNNING'
+             AND job.is_deleted = false
+            WHERE route.is_deleted = false
+              AND (
+                    (
+                        route.route_status = 'PENDING'
+                        AND route.next_retry_at IS NOT NULL
+                        AND route.next_retry_at <= :now
+                    )
+                    OR (
+                        route.route_status = 'PROCESSING'
+                        AND route.modified_at < :staleBefore
+                    )
+              )
+            ORDER BY COALESCE(route.next_retry_at, route.modified_at), route.created_at
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findRunningJobBuildTargetIds(
+            @Param("limit") int limit,
+            @Param("now") java.time.LocalDateTime now,
+            @Param("staleBefore") java.time.LocalDateTime staleBefore
+    );
+
+    @Query(value = """
             SELECT route_id
             FROM p_hub_route
             WHERE is_deleted = false
@@ -177,4 +211,52 @@ public interface JpaHubRouteRepositoryImpl extends JpaRepository<HubRoute, UUID>
               AND route.status <> com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.COMPLETE
             """)
     boolean existsIncompleteByBuildHubId(@Param("buildHubId") UUID buildHubId);
+
+    @Query("""
+            SELECT COUNT(route) > 0
+            FROM HubRoute route
+            WHERE route.buildHubId = :buildHubId
+              AND route.isDeleted = false
+              AND route.status IN (
+                    com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.PENDING,
+                    com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.PROCESSING
+              )
+            """)
+    boolean existsActiveByBuildHubId(@Param("buildHubId") UUID buildHubId);
+
+    @Query("""
+            SELECT COUNT(route) > 0
+            FROM HubRoute route
+            WHERE route.buildHubId = :buildHubId
+              AND route.isDeleted = false
+              AND route.status = com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.FAILED
+            """)
+    boolean existsFailedByBuildHubId(@Param("buildHubId") UUID buildHubId);
+
+    @Modifying
+    @Query(value = """
+            UPDATE p_hub_route
+               SET route_status = 'PENDING',
+                   retry_count = 0,
+                   processing_token = NULL,
+                   next_retry_at = CURRENT_TIMESTAMP,
+                   error_message = NULL,
+                   modified_at = CURRENT_TIMESTAMP
+             WHERE build_hub_id = :buildHubId
+               AND route_status = 'FAILED'
+               AND is_deleted = false
+            """, nativeQuery = true)
+    int resetFailedBuildRoutes(@Param("buildHubId") UUID buildHubId);
+
+    @Modifying
+    @Query(value = """
+            UPDATE p_hub_route
+               SET is_deleted = true,
+                   deleted_at = CURRENT_TIMESTAMP,
+                   deleted_by = :deletedBy,
+                   modified_at = CURRENT_TIMESTAMP
+             WHERE is_deleted = false
+               AND (start_hub_id = :hubId OR end_hub_id = :hubId)
+            """, nativeQuery = true)
+    int bulkSoftDeleteByHubId(@Param("hubId") UUID hubId, @Param("deletedBy") Long deletedBy);
 }

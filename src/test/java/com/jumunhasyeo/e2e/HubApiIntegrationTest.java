@@ -2,6 +2,8 @@ package com.jumunhasyeo.e2e;
 
 import com.jumunhasyeo.CommonTestContainer;
 import com.jumunhasyeo.common.exception.ErrorCode;
+import com.jumunhasyeo.hub.infrastructure.outbox.JpaOutboxRepository;
+import com.jumunhasyeo.hub.infrastructure.outbox.OutboxEvent;
 import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.presentation.dto.request.CreateHubReq;
@@ -16,6 +18,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -26,6 +29,9 @@ public class HubApiIntegrationTest extends IntegrationTest {
 
     @Autowired
     private HubCreationSagaService hubCreationSagaService;
+
+    @Autowired
+    private JpaOutboxRepository outboxRepository;
 
     @Override
     protected void beforeEachAfterTruncate() {
@@ -48,7 +54,16 @@ public class HubApiIntegrationTest extends IntegrationTest {
                 .statusCode(201)
                 .extract().path("data.id");
 
+        assertThat(outboxRepository.findAll())
+                .extracting(OutboxEvent::getEventName)
+                .doesNotContain("HubCreatedEvent");
+
         hubCreationSagaService.complete(UUID.fromString(hubId));
+
+        assertThat(outboxRepository.findAll())
+                .filteredOn(event -> event.getEventName().equals("HubCreatedEvent"))
+                .singleElement()
+                .satisfies(event -> assertThat(event.getPayload()).contains(hubId));
 
         // then: 생성된 허브 조회
         given()

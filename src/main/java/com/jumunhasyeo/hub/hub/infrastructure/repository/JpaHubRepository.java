@@ -53,6 +53,34 @@ public interface JpaHubRepository extends JpaRepository<Hub, UUID> {
     @Modifying
     @Query("""
             UPDATE Hub h
+               SET h.status = :failedStatus
+             WHERE h.hubId = :id
+               AND h.status = :pendingStatus
+               AND h.isDeleted = false
+            """)
+    int failRouteBuildIfPending(
+            @Param("id") UUID id,
+            @Param("pendingStatus") HubStatus pendingStatus,
+            @Param("failedStatus") HubStatus failedStatus
+    );
+
+    @Modifying
+    @Query("""
+            UPDATE Hub h
+               SET h.status = :pendingStatus
+             WHERE h.hubId = :id
+               AND h.status = :failedStatus
+               AND h.isDeleted = false
+            """)
+    int retryRouteBuildIfFailed(
+            @Param("id") UUID id,
+            @Param("failedStatus") HubStatus failedStatus,
+            @Param("pendingStatus") HubStatus pendingStatus
+    );
+
+    @Modifying
+    @Query("""
+            UPDATE Hub h
                SET h.status = :failedStatus,
                    h.deletedAt = :deletedAt,
                    h.deletedBy = :deletedBy,

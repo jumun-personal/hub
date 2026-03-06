@@ -7,7 +7,9 @@ import com.jumunhasyeo.hub.hub.application.HubService;
 import com.jumunhasyeo.hub.hub.application.HubServiceImpl;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteBuildJobService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -94,6 +96,16 @@ class HubServiceConfigTest {
         @Primary
         RouteProviderAvailabilityService routeProviderAvailabilityService() {
             return mock(RouteProviderAvailabilityService.class);
+        }
+
+        @Bean
+        HubRouteService hubRouteService() {
+            return mock(HubRouteService.class);
+        }
+
+        @Bean
+        HubRouteBuildJobService hubRouteBuildJobService() {
+            return mock(HubRouteBuildJobService.class);
         }
 
         @Bean

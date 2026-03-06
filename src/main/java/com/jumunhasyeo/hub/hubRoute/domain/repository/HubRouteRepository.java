@@ -14,10 +14,14 @@ public interface HubRouteRepository {
     List<HubRoute> findAll();
     List<HubRoute> findByStartHubOrEndHub(Hub startHub, Hub endHub);
     List<UUID> findRecoveryTargetIds(int limit, LocalDateTime now, LocalDateTime staleBefore);
+    List<UUID> findRunningJobBuildTargetIds(int limit, LocalDateTime now, LocalDateTime staleBefore);
     List<UUID> findRefreshTargetIds(int limit, LocalDateTime now, LocalDateTime staleBefore);
     List<UUID> findRoutePairIds(UUID routeId);
     List<HubRoute> findAllByIdsWithHubsForUpdate(List<UUID> routeIds);
-    void lockBuildHub(UUID buildHubId);
     boolean hasActiveBuildWork();
     boolean hasIncompleteRoutes(UUID buildHubId);
+    boolean hasActiveBuildRoutes(UUID buildHubId);
+    boolean hasFailedBuildRoutes(UUID buildHubId);
+    int resetFailedBuildRoutes(UUID buildHubId);
+    int bulkSoftDeleteByHubId(UUID hubId, Long deletedBy);
 }

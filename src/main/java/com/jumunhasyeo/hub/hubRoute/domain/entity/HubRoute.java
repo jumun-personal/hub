@@ -67,6 +67,9 @@ public class HubRoute extends BaseEntity {
     @Column(name = "next_retry_at")
     private LocalDateTime nextRetryAt;
 
+    @Column(name = "processing_token")
+    private UUID processingToken;
+
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
@@ -103,6 +106,7 @@ public class HubRoute extends BaseEntity {
                 .endHub(endHub)
                 .status(HubRouteStatus.PENDING)
                 .retryCount(0)
+                .nextRetryAt(LocalDateTime.now())
                 .build();
     }
 
@@ -120,10 +124,21 @@ public class HubRoute extends BaseEntity {
         return hubRoutes;
     }
 
-    public void claimProcessing() {
+    public void claimProcessing(UUID processingToken) {
         this.status = HubRouteStatus.PROCESSING;
+        this.processingToken = processingToken;
         this.nextRetryAt = null;
         this.errorMessage = null;
+    }
+
+    public void claimProcessing() {
+        claimProcessing(UUID.randomUUID());
+    }
+
+    public boolean isClaimedBy(UUID processingToken) {
+        return HubRouteStatus.PROCESSING.equals(this.status)
+                && this.processingToken != null
+                && this.processingToken.equals(processingToken);
     }
 
     public void scheduleRecovery(LocalDateTime recoveryAt) {
@@ -132,6 +147,7 @@ public class HubRoute extends BaseEntity {
 
     public void defer(LocalDateTime nextAttemptAt, String reason) {
         this.status = HubRouteStatus.PENDING;
+        this.processingToken = null;
         this.nextRetryAt = nextAttemptAt;
         this.errorMessage = reason;
     }
@@ -145,6 +161,7 @@ public class HubRoute extends BaseEntity {
         this.resolvedProvider = provider;
         this.resolvedByFallback = fallback;
         this.status = HubRouteStatus.COMPLETE;
+        this.processingToken = null;
         this.nextRetryAt = null;
         this.errorMessage = null;
     }
@@ -197,10 +214,12 @@ public class HubRoute extends BaseEntity {
         this.errorMessage = errorMessage;
         if (this.retryCount >= maxRetries) {
             this.status = HubRouteStatus.FAILED;
+            this.processingToken = null;
             this.nextRetryAt = null;
             return true;
         }
         this.status = HubRouteStatus.PENDING;
+        this.processingToken = null;
         this.nextRetryAt = nextRetryAt;
         return false;
     }
@@ -209,6 +228,7 @@ public class HubRoute extends BaseEntity {
         this.retryCount = this.retryCount + 1;
         this.errorMessage = errorMessage;
         this.status = HubRouteStatus.FAILED;
+        this.processingToken = null;
         this.nextRetryAt = null;
     }
 

@@ -1,11 +1,7 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
-import com.jumunhasyeo.common.exception.BusinessException;
-import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
-import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
-import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.command.RoutePairBuildTarget;
 import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
@@ -31,9 +27,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RoutePairLifecycleService {
 
-    private final HubRepository hubRepository;
     private final HubRouteRepository hubRouteRepository;
     private final HubRouteEventPublisher hubRouteEventPublisher;
+    private final HubRouteBuildJobService hubRouteBuildJobService;
+    private final HubRoutePlanningService hubRoutePlanningService;
 
     @Value("${hub.route.build.event-recovery-delay:5m}")
     private String eventRecoveryDelay;
@@ -62,7 +59,8 @@ public class RoutePairLifecycleService {
             return Optional.empty();
         }
 
-        routes.forEach(HubRoute::claimProcessing);
+        UUID processingToken = UUID.randomUUID();
+        routes.forEach(route -> route.claimProcessing(processingToken));
         hubRouteRepository.saveAll(routes);
         HubRoute representative = routes.get(0);
         return Optional.of(new RoutePairBuildTarget(
@@ -72,7 +70,8 @@ public class RoutePairLifecycleService {
                 representative.getStartHub().getCoordinate(),
                 representative.getEndHub().getCoordinate(),
                 resolvePurpose(representative.getStartHub(), representative.getEndHub()),
-                routes.stream().mapToInt(HubRoute::getRetryCount).max().orElse(0)
+                routes.stream().mapToInt(HubRoute::getRetryCount).max().orElse(0),
+                processingToken
         ));
     }
 
@@ -105,29 +104,31 @@ public class RoutePairLifecycleService {
                 representative.getStartHub().getCoordinate(),
                 representative.getEndHub().getCoordinate(),
                 resolvePurpose(representative.getStartHub(), representative.getEndHub()),
-                0
+                0,
+                null
         ));
     }
 
     @Transactional
     public void completeRoutePairBuild(
             List<UUID> routeIds,
+            UUID processingToken,
             RouteWeight routeWeight,
             RouteProvider provider,
             boolean fallback
     ) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
+        if (!isClaimOwned(routes, processingToken)) {
             return;
         }
         UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
 
         List<HubRoute> completedRoutes = routes.stream()
                 .filter(route -> !route.isComplete())
                 .toList();
+        if (completedRoutes.isEmpty()) {
+            return;
+        }
         LocalDateTime nextRefreshAt = nextRefreshAt(routeIds, fallback);
         completedRoutes.forEach(route -> route.complete(routeWeight, provider, fallback, nextRefreshAt));
         hubRouteRepository.saveAll(completedRoutes);
@@ -139,26 +140,28 @@ public class RoutePairLifecycleService {
             );
         }
 
-        if (buildHubId != null && !hubRouteRepository.hasIncompleteRoutes(buildHubId)) {
-            hubRouteEventPublisher.publishRouteBuildCompleted(buildCompletedCommand(buildHubId));
+        if (buildHubId != null) {
+            hubRouteBuildJobService.completePair(buildHubId)
+                    .ifPresent(counter -> hubRoutePlanningService.finalizeIfTerminal(
+                            counter,
+                            "one or more hub routes failed"
+                    ));
         }
     }
 
     @Transactional
     public void failRoutePairBuild(
             List<UUID> routeIds,
+            UUID processingToken,
             String reason,
             int maxRetries,
             Duration retryBackoff
     ) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
+        if (!isClaimOwned(routes, processingToken)) {
             return;
         }
         UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
 
         LocalDateTime nextRetryAt = LocalDateTime.now().plus(retryBackoff);
         boolean finalFailed = routes.stream()
@@ -168,20 +171,18 @@ public class RoutePairLifecycleService {
         hubRouteRepository.saveAll(routes);
 
         if (finalFailed && buildHubId != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(buildHubId, reason);
+            hubRouteBuildJobService.failPair(buildHubId, reason)
+                    .ifPresent(counter -> hubRoutePlanningService.finalizeIfTerminal(counter, reason));
         }
     }
 
     @Transactional
-    public void failRoutePairBuildPermanently(List<UUID> routeIds, String reason) {
+    public void failRoutePairBuildPermanently(List<UUID> routeIds, UUID processingToken, String reason) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
+        if (!isClaimOwned(routes, processingToken)) {
             return;
         }
         UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
 
         routes.stream()
                 .filter(route -> !route.isComplete())
@@ -189,13 +190,17 @@ public class RoutePairLifecycleService {
         hubRouteRepository.saveAll(routes);
 
         if (buildHubId != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(buildHubId, reason);
+            hubRouteBuildJobService.failPair(buildHubId, reason)
+                    .ifPresent(counter -> hubRoutePlanningService.finalizeIfTerminal(counter, reason));
         }
     }
 
     @Transactional
-    public void deferRoutePairBuild(List<UUID> routeIds, String reason, Duration delay) {
+    public void deferRoutePairBuild(List<UUID> routeIds, UUID processingToken, String reason, Duration delay) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
+        if (!isClaimOwned(routes, processingToken)) {
+            return;
+        }
         LocalDateTime nextAttemptAt = LocalDateTime.now().plus(delay);
         routes.stream()
                 .filter(route -> !route.isComplete())
@@ -271,12 +276,10 @@ public class RoutePairLifecycleService {
         );
     }
 
-    private BuildRouteCommand buildCompletedCommand(UUID buildHubId) {
-        Hub hub = hubRepository.findByIdIncludingCreating(buildHubId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-        UUID centerHubId = hub.isBranchHub()
-                ? hub.getCenterHubs().stream().findFirst().map(Hub::getHubId).orElse(null)
-                : null;
-        return new BuildRouteCommand(centerHubId, hub.getHubId(), hub.getName(), hub.getAddress(), hub.getHubType());
+    private boolean isClaimOwned(List<HubRoute> routes, UUID processingToken) {
+        return !routes.isEmpty()
+                && processingToken != null
+                && routes.stream().allMatch(route -> route.isClaimedBy(processingToken));
     }
+
 }

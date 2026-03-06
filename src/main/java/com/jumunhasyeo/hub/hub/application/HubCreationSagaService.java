@@ -3,6 +3,7 @@ package com.jumunhasyeo.hub.hub.application;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRelationRepository;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
@@ -32,10 +33,29 @@ public class HubCreationSagaService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
         int updated = hubRepository.completeIfPending(hubId);
         if (updated == 1) {
+            hubEventPublisher.publishEvent(HubCreatedEvent.from(hub));
             log.info("Hub route build completed. hubId={}", hubId);
             return;
         }
         log.info("Hub completion skipped. hubId={}, status={}, deleted={}", hubId, hub.getStatus(), hub.isDeleted());
+    }
+
+    @Transactional
+    public void failRouteBuild(UUID hubId, String reason) {
+        int updated = hubRepository.failRouteBuildIfPending(hubId);
+        if (updated != 1) {
+            throw new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION);
+        }
+        log.warn("Hub route build failed. hubId={}, reason={}", hubId, reason);
+    }
+
+    @Transactional
+    public void retryRouteBuild(UUID hubId) {
+        int updated = hubRepository.retryRouteBuildIfFailed(hubId);
+        if (updated != 1) {
+            throw new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION);
+        }
+        log.info("Hub route build retry requested. hubId={}", hubId);
     }
 
     @Transactional

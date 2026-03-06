@@ -155,8 +155,8 @@ public class OutboxPublicationServiceIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("Hub 생성 Outbox가 DEAD가 되면 PENDING Hub를 FAILED로 전환한다.")
-    void publishClaimedEvent_WhenHubCreatedEventBecomesDead_marksHubFailed() {
+    @DisplayName("Hub 생성 Outbox가 DEAD가 되어도 Hub 상태는 Job 흐름에 맡기고 변경하지 않는다.")
+    void publishClaimedEvent_WhenHubCreatedEventBecomesDead_doesNotMarkHubFailed() {
         // given
         Hub hub = jpaHubRepository.save(Hub.of(
                 "Outbox 실패 허브",
@@ -176,9 +176,9 @@ public class OutboxPublicationServiceIntegrationTest extends IntegrationTest {
         outboxService.publishClaimedEvent(outboxEvent);
 
         // then
-        Hub failedHub = jpaHubRepository.findByIdIncludingDeleted(hub.getHubId()).orElseThrow();
-        assertThat(failedHub.getStatus()).isEqualTo(HubStatus.FAILED);
-        assertThat(failedHub.isDeleted()).isTrue();
+        Hub pendingHub = jpaHubRepository.findByIdIncludingDeleted(hub.getHubId()).orElseThrow();
+        assertThat(pendingHub.getStatus()).isEqualTo(HubStatus.PENDING);
+        assertThat(pendingHub.isDeleted()).isFalse();
     }
 
     private static Hub createHub() {

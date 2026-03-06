@@ -1,0 +1,151 @@
+name: hub-current-isolation
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hub-current-postgres
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: hub-current-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: hub-current-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: "ciWo7IWazngRchmPES6q5A=="
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:29092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  map-stub:
+    image: node:22-alpine
+    container_name: hub-current-map-stub
+    working_dir: /app
+    volumes:
+      - ./map-stub.mjs:/app/map-stub.mjs:ro
+    environment:
+      MAP_STUB_LATENCY_MS: "2000"
+    command: ["node", "/app/map-stub.mjs"]
+
+  hub-api:
+    image: eclipse-temurin:21-jre-jammy
+    container_name: hub-current-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      map-stub:
+        condition: service_started
+    cpus: 1.0
+    mem_limit: 1g
+    ports:
+      - "18088:8080"
+    volumes:
+      - ../../build/libs/hub_prodcut_stock_company-0.0.1-SNAPSHOT.jar:/app.jar:ro
+      - ./results:/results
+    environment:
+      SPRING_PROFILES_ACTIVE: test,hub-api
+      SPRING_TASK_SCHEDULING_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_LISTENER_AUTO_STARTUP: "true"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/testdb
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "${HUB_BENCHMARK_API_HIKARI_POOL_SIZE:-20}"
+      SPRING_DATA_REDIS_CACHE_HOST: redis
+      KAKAO_MOBILITY_BASE_URL: http://map-stub:18080
+      HUB_ROUTE_PLANNING_SCHEDULER_ENABLED: "${HUB_CURRENT_API_ROUTE_PLANNING_SCHEDULER_ENABLED:-false}"
+      HUB_ROUTE_BUILD_SCHEDULER_ENABLED: "${HUB_CURRENT_API_ROUTE_BUILD_SCHEDULER_ENABLED:-false}"
+      HUB_ROUTE_REFRESH_ENABLED: "false"
+      HUB_ROUTE_WORKER_ENABLED: "false"
+      HUB_API_EVENTS_ENABLED: "true"
+      STOCK_EVENTS_ENABLED: "false"
+      STOCK_INBOX_SCHEDULER_ENABLED: "false"
+    command:
+      - java
+      - "${HUB_BENCHMARK_XMS:--Xms256m}"
+      - "${HUB_BENCHMARK_XMX:--Xmx512m}"
+      - -XX:ActiveProcessorCount=1
+      - "${HUB_BENCHMARK_GC_OPTION:--XX:+UseG1GC}"
+      - -Xlog:gc*:file=/results/current-api-gc.log:time,uptime,level,tags
+      - -XX:StartFlightRecording=filename=/results/current-api.jfr,settings=default,dumponexit=true
+      - -jar
+      - /app.jar
+
+  route-worker:
+    image: eclipse-temurin:21-jre-jammy
+    container_name: hub-current-route-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      map-stub:
+        condition: service_started
+    cpus: 1.0
+    mem_limit: 1g
+    volumes:
+      - ../../build/libs/hub_prodcut_stock_company-0.0.1-SNAPSHOT.jar:/app.jar:ro
+      - ./results:/results
+    environment:
+      SPRING_PROFILES_ACTIVE: test,route-worker
+      SPRING_TASK_SCHEDULING_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_LISTENER_AUTO_STARTUP: "true"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/testdb
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "${HUB_BENCHMARK_WORKER_HIKARI_POOL_SIZE:-20}"
+      SPRING_DATA_REDIS_CACHE_HOST: redis
+      KAKAO_MOBILITY_BASE_URL: http://map-stub:18080
+      HUB_ROUTE_PLANNING_SCHEDULER_ENABLED: "${HUB_BENCHMARK_WORKER_ROUTE_PLANNING_SCHEDULER_ENABLED:-true}"
+      HUB_ROUTE_BUILD_SCHEDULER_ENABLED: "${HUB_BENCHMARK_WORKER_ROUTE_BUILD_SCHEDULER_ENABLED:-true}"
+      HUB_ROUTE_BUILD_BATCH_SIZE: "${HUB_ROUTE_BUILD_BATCH_SIZE:-10}"
+      HUB_ROUTE_BUILD_FIXED_DELAY_MS: "${HUB_ROUTE_BUILD_FIXED_DELAY_MS:-500}"
+      HUB_ROUTE_REFRESH_ENABLED: "false"
+      HUB_ROUTE_WORKER_ENABLED: "true"
+      HUB_API_EVENTS_ENABLED: "false"
+      STOCK_EVENTS_ENABLED: "false"
+      STOCK_INBOX_SCHEDULER_ENABLED: "false"
+    command:
+      - java
+      - "${HUB_BENCHMARK_XMS:--Xms256m}"
+      - "${HUB_BENCHMARK_XMX:--Xmx512m}"
+      - -XX:ActiveProcessorCount=1
+      - "${HUB_BENCHMARK_GC_OPTION:--XX:+UseG1GC}"
+      - -Xlog:gc*:file=/results/current-worker-gc.log:time,uptime,level,tags
+      - -XX:StartFlightRecording=filename=/results/current-worker.jfr,settings=default,dumponexit=true
+      - -jar
+      - /app.jar

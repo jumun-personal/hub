@@ -76,7 +76,6 @@ spring:
       auto-startup: false
     topics:
       hub: hub-test
-      hub-route-build: hub-route-build-test
       order: order-test
     producer:
       retries: 0
@@ -123,6 +122,9 @@ naver:
     api-key: dummy-naver-api-key-for-test
 
 hub:
+  outbox:
+    scheduler:
+      enabled: true
   cache:
     ttl: 30m
     lock-ttl: 3s
@@ -132,8 +134,16 @@ hub:
   compensation:
     deleted-by: 0
   route:
+    events:
+      enabled: true
+    planning:
+      scheduler:
+        enabled: false
+      fixed-delay-ms: 500
+      stale-timeout: 5m
     worker:
-      concurrency: 1
+      enabled: true
+      concurrency: 2
     provider-unavailable-ttl: 30s
     rate-limit:
       kakao:
@@ -154,7 +164,7 @@ hub:
       scheduler:
         enabled: false
       fixed-delay-ms: 1000
-      batch-size: 10
+      batch-size: 2
       stale-processing-timeout: 5m
       primary-retry-delay: 5s
       retry-backoff: 10s

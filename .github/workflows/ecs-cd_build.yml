@@ -47,11 +47,11 @@ jobs:
           cp src/main/resources/application-sample.yml src/main/resources/application.yml
           echo "application.yml created"
 
-      - name: ./gradlew clean build -x test
+      - name: 테스트 및 빌드
         env:
           GITHUB_USERNAME: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.github-token }}
-        run: ./gradlew clean build -x test
+        run: ./gradlew clean build -Dspring.profiles.active=test
 
       - name: 생성된 jar 'build/libs/app-jar' Upload ...
         uses: actions/upload-artifact@v4

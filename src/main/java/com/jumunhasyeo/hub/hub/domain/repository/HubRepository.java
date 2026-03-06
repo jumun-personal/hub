@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface HubRepository {
     Hub save(Hub hub);
+    void flush();
     Optional<Hub> findById(UUID id);
     Optional<Hub> findByIdIncludingCreating(UUID id);
     Optional<Hub> findByIdIncludingDeleted(UUID id);
@@ -18,5 +19,7 @@ public interface HubRepository {
     List<Hub> findAllByHubType(HubType type);
     List<Hub> findAll();
     int completeIfPending(UUID hubId);
+    int failRouteBuildIfPending(UUID hubId);
+    int retryRouteBuildIfFailed(UUID hubId);
     int failIfPending(UUID hubId, LocalDateTime deletedAt, Long deletedBy);
 }

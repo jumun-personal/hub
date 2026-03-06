@@ -21,6 +21,7 @@ import com.jumunhasyeo.stock.infrastructure.inbox.JpaInboxRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -34,6 +35,7 @@ class RuntimeRoleContextTest {
             .withBean(HubRouteService.class, () -> mock(HubRouteService.class))
             .withBean(RouteWorkLifecycle.class, () -> mock(RouteWorkLifecycle.class))
             .withBean(RouteProviderAvailabilityService.class, () -> mock(RouteProviderAvailabilityService.class))
+            .withBean(ThreadPoolTaskExecutor.class, () -> mock(ThreadPoolTaskExecutor.class))
             .withBean(OrderCompensateHandler.class, () -> mock(OrderCompensateHandler.class))
             .withBean(OrderAclService.class, () -> mock(OrderAclService.class))
             .withBean(InboxService.class, () -> mock(InboxService.class))

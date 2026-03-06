@@ -6,9 +6,6 @@ import com.jumunhasyeo.common.util.KafkaUtil;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubUpdatedEvent;
-import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildFailedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,7 +24,6 @@ import static com.jumunhasyeo.hub.hub.infrastructure.event.ListenEventRegistry.*
 public class HubKafkaEventListener {
 
     private final ObjectMapper objectMapper;
-    private final HubCreationSagaService hubCreationSagaService;
 
     @KafkaListener(
             topics = "${spring.kafka.topics.hub}",
@@ -57,11 +53,9 @@ public class HubKafkaEventListener {
         } else if (simpleClassName.equals(HUB_UPDATE_EVENT.getEventName())) {
             objectMapper.readValue(payload, HubUpdatedEvent.class);
         } else if (simpleClassName.equals(HUB_ROUTE_BUILD_COMPLETED_EVENT.getEventName())) {
-            HubRouteBuildCompletedEvent event = objectMapper.readValue(payload, HubRouteBuildCompletedEvent.class);
-            hubCreationSagaService.complete(event.getHubId());
+            log.debug("Skip legacy hub-route build completed event.");
         } else if (simpleClassName.equals(HUB_ROUTE_BUILD_FAILED_EVENT.getEventName())) {
-            HubRouteBuildFailedEvent event = objectMapper.readValue(payload, HubRouteBuildFailedEvent.class);
-            hubCreationSagaService.compensate(event.getHubId(), event.getReason());
+            log.debug("Skip legacy hub-route build failed event.");
         } else {
             return;
         }

@@ -66,7 +66,6 @@ spring:
     # 토픽 설정 (커스텀)
     topics:
       hub: hub
-      hub-route-build: hub-route-build
       order: order
     producer:
       retries: 3
@@ -119,6 +118,9 @@ hub:
   api:
     events:
       enabled: ${HUB_API_EVENTS_ENABLED:true}
+  outbox:
+    scheduler:
+      enabled: ${HUB_OUTBOX_SCHEDULER_ENABLED:true}
   cache:
     ttl: ${HUB_CACHE_TTL:30m}
     lock-ttl: ${HUB_CACHE_LOCK_TTL:3s}
@@ -128,15 +130,22 @@ hub:
   compensation:
     deleted-by: ${HUB_COMPENSATION_DELETED_BY:0}
   route:
+    events:
+      enabled: ${HUB_ROUTE_EVENTS_ENABLED:true}
+    planning:
+      scheduler:
+        enabled: ${HUB_ROUTE_PLANNING_SCHEDULER_ENABLED:false}
+      fixed-delay-ms: ${HUB_ROUTE_PLANNING_FIXED_DELAY_MS:500}
+      stale-timeout: ${HUB_ROUTE_PLANNING_STALE_TIMEOUT:5m}
     worker:
-      enabled: ${HUB_ROUTE_WORKER_ENABLED:true}
-      concurrency: ${HUB_ROUTE_WORKER_CONCURRENCY:3}
+      enabled: ${HUB_ROUTE_WORKER_ENABLED:false}
+      concurrency: ${HUB_ROUTE_WORKER_CONCURRENCY:2}
     provider-unavailable-ttl: ${HUB_ROUTE_PROVIDER_UNAVAILABLE_TTL:30s}
     rate-limit:
       kakao:
-        permits-per-second: ${HUB_ROUTE_KAKAO_PERMITS_PER_SECOND:3}
+        permits-per-second: ${HUB_ROUTE_KAKAO_PERMITS_PER_SECOND:20}
       naver:
-        permits-per-second: ${HUB_ROUTE_NAVER_PERMITS_PER_SECOND:3}
+        permits-per-second: ${HUB_ROUTE_NAVER_PERMITS_PER_SECOND:20}
       retry-delay: ${HUB_ROUTE_RATE_LIMIT_RETRY_DELAY:1s}
       retry-jitter-max: ${HUB_ROUTE_RATE_LIMIT_RETRY_JITTER_MAX:500ms}
     refresh:
@@ -150,8 +159,8 @@ hub:
     build:
       scheduler:
         enabled: ${HUB_ROUTE_BUILD_SCHEDULER_ENABLED:true}
-      fixed-delay-ms: ${HUB_ROUTE_BUILD_FIXED_DELAY_MS:1000}
-      batch-size: ${HUB_ROUTE_BUILD_BATCH_SIZE:10}
+      fixed-delay-ms: ${HUB_ROUTE_BUILD_FIXED_DELAY_MS:500}
+      batch-size: ${HUB_ROUTE_BUILD_BATCH_SIZE:2}
       stale-processing-timeout: ${HUB_ROUTE_BUILD_STALE_PROCESSING_TIMEOUT:5m}
       event-recovery-delay: ${HUB_ROUTE_BUILD_EVENT_RECOVERY_DELAY:5m}
       primary-retry-delay: ${HUB_ROUTE_PRIMARY_RETRY_DELAY:5s}
@@ -208,11 +217,11 @@ resilience4j:
   ratelimiter:
     instances:
       kakaoRoute:
-        limitForPeriod: 3
+        limitForPeriod: 20
         limitRefreshPeriod: 1s
         timeoutDuration: 0ms
       naverRoute:
-        limitForPeriod: 3
+        limitForPeriod: 20
         limitRefreshPeriod: 1s
         timeoutDuration: 0ms
 

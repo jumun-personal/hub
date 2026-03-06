@@ -10,6 +10,7 @@ import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteBuildJobService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
@@ -142,12 +143,14 @@ class HubCreateAsyncSeparationServiceMeasurementTest {
         HubRepository hubRepository = mock(HubRepository.class);
         HubRepositoryCustom hubRepositoryCustom = mock(HubRepositoryCustom.class);
         HubEventPublisher hubEventPublisher = mock(HubEventPublisher.class);
-        RouteProviderAvailabilityService routeProviderAvailabilityService = mock(RouteProviderAvailabilityService.class);
+        HubRouteService hubRouteService = mock(HubRouteService.class);
+        HubRouteBuildJobService hubRouteBuildJobService = mock(HubRouteBuildJobService.class);
         HubServiceImpl hubService = new HubServiceImpl(
                 hubRepository,
                 hubRepositoryCustom,
                 hubEventPublisher,
-                routeProviderAvailabilityService
+                hubRouteService,
+                hubRouteBuildJobService
         );
 
         given(hubRepository.findById(scenario.centerHub().getHubId())).willReturn(Optional.of(scenario.centerHub()));

@@ -13,6 +13,7 @@ public record RoutePairBuildTarget(
         Coordinate startCoordinate,
         Coordinate endCoordinate,
         RoutePurpose purpose,
-        int retryCount
+        int retryCount,
+        UUID processingToken
 ) {
 }

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.common.util.KafkaUtil;
 import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,18 +16,17 @@ import org.springframework.stereotype.Component;
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_CREATED_EVENT;
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_DELETED_EVENT;
 import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_ROUTE_BUILD_COMPLETED_EVENT;
-import static com.jumunhasyeo.hub.hubRoute.infrastructure.event.ListenEventRegistry.HUB_ROUTE_BUILD_REQUESTED_EVENT;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "hub.route.worker.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hub.route.worker.enabled", havingValue = "true")
 public class HubRouteKafkaEventListener {
 
     private final HubRouteEventHandler hubRouteEventHandler;
     private final ObjectMapper objectMapper;
     @KafkaListener(
-            topics = {"${spring.kafka.topics.hub}", "${spring.kafka.topics.hub-route-build:hub-route-build}"},
+            topics = "${spring.kafka.topics.hub}",
             groupId = "${spring.kafka.consumer.hub-route}",
             containerFactory = "hubRouteKafkaListenerContainerFactory"
     )
@@ -58,10 +56,6 @@ public class HubRouteKafkaEventListener {
 
         } else if (simpleClassName.equals(HUB_ROUTE_BUILD_COMPLETED_EVENT.getEventName())) {
             log.debug("Skip hub-route build result event: {}", simpleClassName);
-        } else if (simpleClassName.equals(HUB_ROUTE_BUILD_REQUESTED_EVENT.getEventName())) {
-            HubRouteBuildRequestedEvent routeBuildRequestedEvent =
-                    objectMapper.readValue(payload, HubRouteBuildRequestedEvent.class);
-            hubRouteEventHandler.routeBuildRequested(routeBuildRequestedEvent);
         } else {
             return;
         }

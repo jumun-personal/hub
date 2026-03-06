@@ -1,6 +1,5 @@
 package com.jumunhasyeo.hub.infrastructure.outbox;
 
-import com.jumunhasyeo.hub.hub.application.HubCreationOutboxFailureHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,7 +13,6 @@ import java.util.Optional;
 class OutboxStateTransitions {
 
     private final JpaOutboxRepository outboxRepository;
-    private final HubCreationOutboxFailureHandler terminalFailureHandler;
 
     @Transactional
     public Optional<OutboxEvent> claimByEventKey(String eventKey, LocalDateTime staleBefore) {
@@ -57,15 +55,11 @@ class OutboxStateTransitions {
     public void markPublishFailure(OutboxEvent event, String errorMessage) {
         event.publishFail(errorMessage);
         outboxRepository.save(event);
-        if (event.getStatus() == OutboxStatus.DEAD) {
-            terminalFailureHandler.handle(event);
-        }
     }
 
     @Transactional
     public void markPublishDead(OutboxEvent event, String errorMessage) {
         event.markDead(errorMessage);
         outboxRepository.save(event);
-        terminalFailureHandler.handle(event);
     }
 }

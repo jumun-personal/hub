@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.convert.DurationStyle;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,22 +36,24 @@ public class RouteWorkLifecycle {
     @Value("${hub.route.refresh.non-retryable-delay:30m}")
     private String nonRetryableRefreshDelay;
 
-    public void build(List<UUID> routeIds) {
+    public Optional<RoutePairBuildTarget> claimBuild(final List<UUID> routeIds) {
         if (routeProviderAvailabilityService.isAllProvidersUnavailable()) {
             log.info("Skip route pair build. providers are unavailable. routeIds={}", routeIds);
-            return;
+            return Optional.empty();
         }
+        return routePairLifecycleService.claimRoutePairBuild(routeIds);
+    }
 
-        Optional<RoutePairBuildTarget> claimed = routePairLifecycleService.claimRoutePairBuild(routeIds);
-        if (claimed.isEmpty()) {
-            return;
-        }
+    public void build(final List<UUID> routeIds) {
+        claimBuild(routeIds).ifPresent(this::build);
+    }
 
-        RoutePairBuildTarget target = claimed.get();
+    public void build(final RoutePairBuildTarget target) {
         try {
             RouteWeightResult result = routeProviderResolution.resolve(toQuery(target));
             routePairLifecycleService.completeRoutePairBuild(
                     target.routeIds(),
+                    target.processingToken(),
                     RouteWeight.of(result.distanceKm(), result.durationMinutes()),
                     toRouteProvider(result.provider()),
                     result.fromFallback()
@@ -59,6 +62,7 @@ public class RouteWorkLifecycle {
             log.debug("Route pair delayed by provider rate limit. routeIds={}", target.routeIds());
             routePairLifecycleService.deferRoutePairBuild(
                     target.routeIds(),
+                    target.processingToken(),
                     e.getMessage(),
                     routeDelayPolicy.rateLimitDelay(e.retryAfter())
             );
@@ -66,22 +70,30 @@ public class RouteWorkLifecycle {
             log.info("Retry Kakao primary route provider before fallback. routeIds={}", target.routeIds());
             routePairLifecycleService.failRoutePairBuild(
                     target.routeIds(),
+                    target.processingToken(),
                     e.getMessage(),
                     maxRetries,
                     routeDelayPolicy.primaryRetryDelay()
             );
         } catch (RouteRequestRejectedException | RouteResolutionRejectedException e) {
             log.warn("Route pair build rejected permanently. routeIds={}", target.routeIds(), e);
-            routePairLifecycleService.failRoutePairBuildPermanently(target.routeIds(), e.getMessage());
+            routePairLifecycleService.failRoutePairBuildPermanently(
+                    target.routeIds(), target.processingToken(), e.getMessage());
         } catch (RuntimeException e) {
             log.warn("Route pair build failed. routeIds={}", target.routeIds(), e);
             routePairLifecycleService.failRoutePairBuild(
                     target.routeIds(),
+                    target.processingToken(),
                     e.getMessage(),
                     maxRetries,
                     routeDelayPolicy.buildRetryDelay(target.retryCount())
             );
         }
+    }
+
+    public void releaseBuildClaim(final RoutePairBuildTarget target, final String reason) {
+        routePairLifecycleService.deferRoutePairBuild(
+                target.routeIds(), target.processingToken(), reason, Duration.ZERO);
     }
 
     public void refresh(List<UUID> routeIds) {

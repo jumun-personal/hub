@@ -1,65 +1,82 @@
-# 물류 이커머스 시스템 (백엔드 4인)
+# 물류 이커머스 시스템
 
-- 물류 허브와 허브 간 이동 경로, 상품 재고를 관리하는 서비스입니다.
-- Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Redis 7 · Kafka를 사용합니다.
+- 범위: 물류 허브·허브 간 이동 경로·상품 재고 관리
+- 담당: Hub·HubRoute 생성·갱신 파이프라인
+- 구현: DB Job 기반 비동기 처리. 장애·재시도 흐름 관리
+- 스택: Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Redis 7 · Kafka
 
-## 담당
+## Hub 경로 생성 아키텍처
 
-- Hub·HubRoute 생성 및 갱신 파이프라인
-
-## Hub 생성·경로 구축 파이프라인
+### 요청과 경로 구축 분리
 
 ```mermaid
 flowchart LR
-    Client["Hub 생성 요청"]
-    HubAPI["Hub API<br/>hub-api profile"]
-    DB[("Hub PENDING<br/>+ Outbox")]
-    Kafka["Kafka"]
-    Worker["Route Worker<br/>route-worker profile"]
-    Route[("양방향 Route<br/>JDBC Batch")]
-    Map["Kakao → Naver"]
-    Complete["Hub COMPLETE / FAILED"]
-
-    Client --> HubAPI --> DB --> Kafka --> Worker
-    Worker --> Route --> Map --> Complete
+    Client["Hub 생성 요청"] --> API["hub-api"]
+    API --> DB[("PostgreSQL<br/>Hub · Job · Route · Outbox")]
+    DB --> Worker["route-worker"]
+    Worker --> Map["지도 API"]
+    Map --> DB
+    DB --> Outbox["Outbox publisher"] --> Kafka["Kafka"]
 ```
 
-### Kafka 비동기화와 Outbox
+- 요청: Hub·Job 저장 후 즉시 응답
+- 구축: `route-worker`가 DB 선점. Route Pair 처리
+- 전달: Hub `COMPLETE` 후 Outbox → Kafka 발행
 
-- Hub와 `HubCreatedEvent` Outbox를 같은 Transaction에 저장하고 Commit 이후
-  Kafka로 발행합니다.
-- 발행 실패 이벤트는 Scheduler가 재시도하며, `event_key` UNIQUE 제약으로
-  중복 저장을 방지합니다.
-- 기존 지점 100개·경로쌍 101개·호출당 2,050ms 고정 지연 조건에서 Hub 생성 요청 구간을
-  1회 재측정 기준 `208,999ms → 24ms`로 단축했습니다. `24ms`는 실제 HTTP 요청이
-  아니라 측정 Harness에서 Hub와 Outbox 저장까지의 시간이며, 원본과 한계는
-  [`benchmark/README.md`](benchmark/README.md)에 있습니다.
+## 상태 한눈에 보기
 
-### Route Worker 프로세스 격리
+```mermaid
+flowchart LR
+    Request["Hub 생성 요청"] --> Pending["Hub PENDING<br/>Job 접수"]
+    Pending --> Build["Route Pair 구축"]
+    Build -->|"전체 성공"| Complete["Hub COMPLETE"]
+    Build -->|"최종 실패"| Failed["Hub FAILED"]
+    Failed -->|"운영자 재시도"| Build
+    Complete --> Outbox["Outbox"] --> Kafka["Kafka"]
+```
 
-- 같은 저장소에서 동일한 JAR·이미지를 빌드하고 `hub-api`, `route-worker`
-  프로필로 각각 실행합니다.
-- Hub 조회 API와 외부 API·경로 갱신 작업을 별도 JVM으로 분리해
-  Thread·Heap·GC와 장애 전파 범위를 격리합니다.
+참고: [상세 파이프라인 문서](docs/hub-route-job-pipeline.md#전체-상태-관계도)
+
+## 실행 구성
+
+### 프로세스와 책임
+
+```mermaid
+flowchart TB
+    Api["hub-api<br/>HTTP API · Outbox 재발행"]
+    Worker["route-worker<br/>Job planning · route build"]
+    DB[("PostgreSQL")]
+    Publisher["Outbox publisher"]
+    Kafka["Kafka"]
+
+    Api <--> DB
+    Worker <--> DB
+    DB --> Publisher --> Kafka
+```
 
 ```bash
 SPRING_PROFILES_ACTIVE=dev,hub-api ./gradlew bootRun
 SPRING_PROFILES_ACTIVE=dev,route-worker ./gradlew bootRun
 ```
 
-### 경로 저장 최적화
+- `hub-api`: HTTP API. Hub·Job 생성. Outbox 재발행
+- `route-worker`: Planning·Build scheduler. Hub 완료 전환
+- 제약: Planning·Build는 같은 프로세스 실행. 독립 배포·스케일링 미지원
 
-- `ON CONFLICT DO NOTHING`과 UNIQUE 제약으로 Kafka 중복 소비에 의한 중복
-  경로를 방지합니다.
-- 경로 200건을 단일 Transaction과 JDBC `executeBatch()`로 저장해
-  로컬 Docker 재측정 중앙값 기준 `285.098ms → 121.776ms → 11.277ms`로
-  단축했습니다. 실행 조건과 원본 결과는 [`benchmark/README.md`](benchmark/README.md)에 있습니다.
+## 상세 문서
 
-### 외부 지도 API 장애 대응
+### 구현 근거와 재현 자료
 
-- Naver API 응답시간을 측정해 Connect Timeout `1초`, Read Timeout `4초`를
-  초기값으로 설정했습니다.
-- Timeout·연결 실패·5xx는 Kakao를 지연 재시도하고, 반복 실패나 Circuit
-  Breaker OPEN 시 Naver로 전환합니다.
-- 공급자별 Redis Token Bucket으로 호출량을 제한하고, 두 공급자 모두
-  일시 장애이면 Backoff·Jitter 기반으로 지연 재시도합니다.
+- [Job·경로·Outbox 상태 전이와 재시도](docs/hub-route-job-pipeline.md)
+- [센터·지점 경로 생성 정책](docs/hub-route-algorithm.md)
+- [측정 조건과 원본 결과](benchmark/README.md)
+
+## 검증
+
+### 테스트
+
+```bash
+./gradlew test
+```
+
+성능 측정 조건·원본 결과: [Benchmark 재현 가이드](benchmark/README.md)

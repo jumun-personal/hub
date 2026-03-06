@@ -1,0 +1,21 @@
+# host=Darwin 25.5.0 arm64
+# java=Oracle GraalVM 21+35.1
+# docker_server=27.4.0
+# postgres=postgres:16-alpine
+# redis=redis:7-alpine
+# command=./gradlew hubCacheBenchmark --rerun-tasks
+# http=embedded_tomcat,requests_per_round=3000,concurrency=50,warmup_requests=500,rounds=5,hikari_max_pool=5
+# NONE_summary=median_avg_ms:22.360,median_p50_ms:20.460,median_p95_ms:49.457,median_p99_ms:75.278,median_rps:2172.21,median_db_prepared_statements:3000
+# REDIS_summary=median_avg_ms:14.188,median_p50_ms:12.212,median_p95_ms:26.727,median_p99_ms:36.862,median_rps:3463.37,median_db_prepared_statements:0
+# comparison=avg_reduction_pct:36.55,p50_reduction_pct:40.31,p95_reduction_pct:45.96,p99_reduction_pct:51.03,rps_increase_pct:59.44,db_prepared_statements_reduction_pct:100.00
+mode,round,requests,successes,avg_ms,p50_ms,p95_ms,p99_ms,rps,db_prepared_statements
+NONE,1,3000,3000,33.829,25.113,92.029,150.466,1456.44,3000
+NONE,2,3000,3000,28.867,23.871,67.769,128.377,1703.57,3000
+NONE,3,3000,3000,22.360,20.460,49.457,75.278,2172.21,3000
+NONE,4,3000,3000,21.347,19.849,43.828,70.240,2286.89,3000
+NONE,5,3000,3000,20.783,19.184,36.164,50.465,2382.82,3000
+REDIS,1,3000,3000,18.591,14.259,43.301,85.561,2472.96,0
+REDIS,2,3000,3000,14.188,12.212,27.732,45.405,3463.37,0
+REDIS,3,3000,3000,11.701,10.793,19.504,25.076,3992.27,0
+REDIS,4,3000,3000,11.619,10.582,19.962,24.439,4176.78,0
+REDIS,5,3000,3000,15.528,14.154,26.727,36.862,3095.11,0

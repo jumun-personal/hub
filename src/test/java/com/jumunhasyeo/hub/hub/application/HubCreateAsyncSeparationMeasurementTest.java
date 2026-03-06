@@ -86,22 +86,15 @@ class HubCreateAsyncSeparationMeasurementTest {
     void measure_hub_create_response_time_before_after_async_route_separation() throws Exception {
         List<Measurement> syncRequest = new ArrayList<>();
         List<Measurement> asyncRequest = new ArrayList<>();
-        List<Measurement> skeletonConsumer = new ArrayList<>();
 
         for (int i = 0; i < RUNS; i++) {
             syncRequest.add(runSyncHubCreateRequest());
             asyncRequest.add(runAsyncHubCreateRequest());
-            skeletonConsumer.add(runAsyncSkeletonConsumer());
         }
 
         Measurement syncMedian = median(syncRequest);
         Measurement asyncMedian = median(asyncRequest);
-        Measurement skeletonMedian = median(skeletonConsumer);
         double requestReduction = reductionPercent(syncMedian.elapsedMs(), asyncMedian.elapsedMs());
-        double splitWorkReduction = reductionPercent(
-                syncMedian.elapsedMs(),
-                asyncMedian.elapsedMs() + skeletonMedian.elapsedMs()
-        );
 
         System.out.println("=== Hub creation async route separation measurement ===");
         System.out.printf(
@@ -119,8 +112,7 @@ class HubCreateAsyncSeparationMeasurementTest {
                 ACTUAL_API ? "actual-kakao-naver" : "simulated-fixed-latency"
         );
         System.out.println("Before(sync request): " + syncMedian.toReportLine());
-        System.out.println("After(async request): " + asyncMedian.toReportLine());
-        System.out.println("Async skeleton consumer: " + skeletonMedian.toReportLine());
+        System.out.println("After(DB-buffered request): " + asyncMedian.toReportLine());
         System.out.printf(
                 Locale.ROOT,
                 "Resume sentence: 생성 요청 응답 시간은 기존 동기 경로 생성 대비 %.1f%% 감소 "
@@ -133,18 +125,12 @@ class HubCreateAsyncSeparationMeasurementTest {
                 ROUTE_ROWS,
                 ACTUAL_API ? "실제 지도 API 호출" : "외부 API " + API_LATENCY_MS + "ms 고정 지연"
         );
-        System.out.printf(
-                Locale.ROOT,
-                "Background note: 요청 응답과 비동기 skeleton 저장을 단순 합산해도 %.1f%% 감소 (%,dms -> %,dms)%n",
-                splitWorkReduction,
-                syncMedian.elapsedMs(),
-                asyncMedian.elapsedMs() + skeletonMedian.elapsedMs()
-        );
 
         assertThat(syncMedian.routeRows()).isEqualTo(ROUTE_ROWS);
         assertThat(syncMedian.apiCalls()).isEqualTo(ROUTE_PAIRS);
         assertThat(asyncMedian.outboxRows()).isEqualTo(1);
-        assertThat(skeletonMedian.routeRows()).isEqualTo(ROUTE_ROWS);
+        assertThat(asyncMedian.routeRows()).isEqualTo(ROUTE_ROWS);
+        assertThat(asyncMedian.apiCalls()).isZero();
         assertThat(syncMedian.elapsedMs()).isGreaterThan(asyncMedian.elapsedMs());
     }
 
@@ -227,6 +213,29 @@ class HubCreateAsyncSeparationMeasurementTest {
                         topology.newBranch().longitude()
                 );
                 insertRelation(connection, topology.newBranch().hubId(), topology.centerHub().hubId());
+                List<HubPoint> routeTargets = new ArrayList<>();
+                routeTargets.add(topology.centerHub());
+                routeTargets.addAll(topology.existingBranches());
+                for (HubPoint targetHub : routeTargets) {
+                    insertRoute(
+                            connection,
+                            topology.newBranch().hubId(),
+                            targetHub.hubId(),
+                            topology.newBranch().hubId(),
+                            "PENDING",
+                            null,
+                            null
+                    );
+                    insertRoute(
+                            connection,
+                            targetHub.hubId(),
+                            topology.newBranch().hubId(),
+                            topology.newBranch().hubId(),
+                            "PENDING",
+                            null,
+                            null
+                    );
+                }
                 insertOutboxEvent(connection, topology.newBranch().hubId(), topology.centerHub().hubId());
                 connection.commit();
             } catch (Exception e) {
@@ -236,57 +245,7 @@ class HubCreateAsyncSeparationMeasurementTest {
         }
 
         long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
-        return new Measurement("async-request", elapsedMs, 0, 1, 0, 0, 0);
-    }
-
-    private static Measurement runAsyncSkeletonConsumer() throws Exception {
-        Topology topology = seedExistingTopology();
-        insertNewBranchOutsideMeasurement(topology);
-
-        long started = System.nanoTime();
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                List<HubPoint> routeTargets = new ArrayList<>();
-                routeTargets.add(topology.centerHub());
-                routeTargets.addAll(topology.existingBranches());
-
-                for (HubPoint targetHub : routeTargets) {
-                    insertRoute(connection, topology.newBranch().hubId(), targetHub.hubId(), topology.newBranch().hubId(), "PENDING", null, null);
-                    insertRoute(connection, targetHub.hubId(), topology.newBranch().hubId(), topology.newBranch().hubId(), "PENDING", null, null);
-                }
-
-                connection.commit();
-            } catch (Exception e) {
-                connection.rollback();
-                throw e;
-            }
-        }
-
-        long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
-        return new Measurement("skeleton-consumer", elapsedMs, ROUTE_ROWS, 0, 0, 0, 0);
-    }
-
-    private static void insertNewBranchOutsideMeasurement(Topology topology) throws SQLException {
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                insertHub(
-                        connection,
-                        topology.newBranch().hubId(),
-                        "new-branch",
-                        "BRANCH",
-                        "PENDING",
-                        topology.newBranch().latitude(),
-                        topology.newBranch().longitude()
-                );
-                insertRelation(connection, topology.newBranch().hubId(), topology.centerHub().hubId());
-                connection.commit();
-            } catch (SQLException e) {
-                connection.rollback();
-                throw e;
-            }
-        }
+        return new Measurement("db-buffered-request", elapsedMs, ROUTE_ROWS, 1, 0, 0, 0);
     }
 
     private static Topology seedExistingTopology() throws SQLException {

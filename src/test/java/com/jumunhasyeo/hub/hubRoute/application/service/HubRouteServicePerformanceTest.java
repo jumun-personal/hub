@@ -1,6 +1,7 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -67,7 +68,6 @@ class HubRouteServicePerformanceTest {
         );
 
         given(hubRepository.findByIdIncludingCreating(newBranch.getHubId())).willReturn(Optional.of(newBranch));
-        given(hubRepository.findById(centerHub.getHubId())).willReturn(Optional.of(centerHub));
         given(hubRouteRepository.findByStartHubOrEndHub(newBranch, newBranch)).willReturn(java.util.List.of());
         given(hubRouteRepository.insertIgnore(org.mockito.ArgumentMatchers.any(Set.class)))
                 .willAnswer(invocation -> {
@@ -99,6 +99,7 @@ class HubRouteServicePerformanceTest {
                 .hubId(UUID.randomUUID())
                 .name(name)
                 .hubType(type)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of("주소", Coordinate.of(lat, lng)))
                 .centerHubRelations(new HashSet<>())
                 .branchHubRelations(new HashSet<>())
