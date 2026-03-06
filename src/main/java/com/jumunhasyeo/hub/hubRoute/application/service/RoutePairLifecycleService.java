@@ -1,11 +1,7 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
-import com.jumunhasyeo.common.exception.BusinessException;
-import com.jumunhasyeo.common.exception.ErrorCode;
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
-import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
-import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.command.RoutePairBuildTarget;
 import com.jumunhasyeo.hub.hubRoute.application.dto.RoutePurpose;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
@@ -31,12 +27,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RoutePairLifecycleService {
 
-    private final HubRepository hubRepository;
     private final HubRouteRepository hubRouteRepository;
     private final HubRouteEventPublisher hubRouteEventPublisher;
+    private final HubRouteBuildJobService hubRouteBuildJobService;
+    private final HubRoutePlanningService hubRoutePlanningService;
 
-    @Value("${hub.route.build.event-recovery-delay:5m}")
-    private String eventRecoveryDelay;
+    @Value("${hub.route.build.stale-processing-timeout:7m}")
+    private String staleProcessingTimeout;
+
+    @Value("${hub.route.refresh.stale-timeout:5m}")
+    private String staleRefreshTimeout;
 
     @Value("${hub.route.refresh.interval:5m}")
     private String routeRefreshInterval;
@@ -51,7 +51,7 @@ public class RoutePairLifecycleService {
         if (routes.size() != distinctRouteIds.size()) {
             return Optional.empty();
         }
-        LocalDateTime staleBefore = LocalDateTime.now().minus(eventRecoveryDelay());
+        LocalDateTime staleBefore = LocalDateTime.now().minus(staleProcessingTimeout());
         boolean allClaimable = routes.stream().allMatch(route ->
                 HubRouteStatus.PENDING.equals(route.getStatus())
                         || (HubRouteStatus.PROCESSING.equals(route.getStatus())
@@ -85,7 +85,7 @@ public class RoutePairLifecycleService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime staleBefore = now.minus(eventRecoveryDelay());
+        LocalDateTime staleBefore = now.minus(staleRefreshTimeout());
         boolean allRefreshable = routes.stream().allMatch(route ->
                 route.isComplete()
                         && (route.getNextRefreshAt() == null || !route.getNextRefreshAt().isAfter(now))
@@ -117,17 +117,17 @@ public class RoutePairLifecycleService {
             boolean fallback
     ) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
+        if (!isProcessing(routes)) {
             return;
         }
         UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
 
         List<HubRoute> completedRoutes = routes.stream()
                 .filter(route -> !route.isComplete())
                 .toList();
+        if (completedRoutes.isEmpty()) {
+            return;
+        }
         LocalDateTime nextRefreshAt = nextRefreshAt(routeIds, fallback);
         completedRoutes.forEach(route -> route.complete(routeWeight, provider, fallback, nextRefreshAt));
         hubRouteRepository.saveAll(completedRoutes);
@@ -139,8 +139,12 @@ public class RoutePairLifecycleService {
             );
         }
 
-        if (buildHubId != null && !hubRouteRepository.hasIncompleteRoutes(buildHubId)) {
-            hubRouteEventPublisher.publishRouteBuildCompleted(buildCompletedCommand(buildHubId));
+        if (buildHubId != null) {
+            hubRouteBuildJobService.completePair(buildHubId)
+                    .ifPresent(counter -> hubRoutePlanningService.finalizeIfTerminal(
+                            counter,
+                            "one or more hub routes failed"
+                    ));
         }
     }
 
@@ -152,13 +156,10 @@ public class RoutePairLifecycleService {
             Duration retryBackoff
     ) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
+        if (!isProcessing(routes)) {
             return;
         }
         UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
 
         LocalDateTime nextRetryAt = LocalDateTime.now().plus(retryBackoff);
         boolean finalFailed = routes.stream()
@@ -168,20 +169,18 @@ public class RoutePairLifecycleService {
         hubRouteRepository.saveAll(routes);
 
         if (finalFailed && buildHubId != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(buildHubId, reason);
+            hubRouteBuildJobService.failPair(buildHubId, reason)
+                    .ifPresent(counter -> hubRoutePlanningService.finalizeIfTerminal(counter, reason));
         }
     }
 
     @Transactional
     public void failRoutePairBuildPermanently(List<UUID> routeIds, String reason) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
-        if (routes.isEmpty()) {
+        if (!isProcessing(routes)) {
             return;
         }
         UUID buildHubId = routes.get(0).getBuildHubId();
-        if (buildHubId != null) {
-            hubRouteRepository.lockBuildHub(buildHubId);
-        }
 
         routes.stream()
                 .filter(route -> !route.isComplete())
@@ -189,13 +188,17 @@ public class RoutePairLifecycleService {
         hubRouteRepository.saveAll(routes);
 
         if (buildHubId != null) {
-            hubRouteEventPublisher.publishRouteBuildFailed(buildHubId, reason);
+            hubRouteBuildJobService.failPair(buildHubId, reason)
+                    .ifPresent(counter -> hubRoutePlanningService.finalizeIfTerminal(counter, reason));
         }
     }
 
     @Transactional
     public void deferRoutePairBuild(List<UUID> routeIds, String reason, Duration delay) {
         List<HubRoute> routes = hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds);
+        if (!isProcessing(routes)) {
+            return;
+        }
         LocalDateTime nextAttemptAt = LocalDateTime.now().plus(delay);
         routes.stream()
                 .filter(route -> !route.isComplete())
@@ -259,9 +262,15 @@ public class RoutePairLifecycleService {
         return nextRefreshAt(routeIds);
     }
 
-    private Duration eventRecoveryDelay() {
+    private Duration staleProcessingTimeout() {
         return DurationStyle.detectAndParse(
-                eventRecoveryDelay == null || eventRecoveryDelay.isBlank() ? "5m" : eventRecoveryDelay
+                staleProcessingTimeout == null || staleProcessingTimeout.isBlank() ? "7m" : staleProcessingTimeout
+        );
+    }
+
+    private Duration staleRefreshTimeout() {
+        return DurationStyle.detectAndParse(
+                staleRefreshTimeout == null || staleRefreshTimeout.isBlank() ? "5m" : staleRefreshTimeout
         );
     }
 
@@ -271,12 +280,8 @@ public class RoutePairLifecycleService {
         );
     }
 
-    private BuildRouteCommand buildCompletedCommand(UUID buildHubId) {
-        Hub hub = hubRepository.findByIdIncludingCreating(buildHubId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));
-        UUID centerHubId = hub.isBranchHub()
-                ? hub.getCenterHubs().stream().findFirst().map(Hub::getHubId).orElse(null)
-                : null;
-        return new BuildRouteCommand(centerHubId, hub.getHubId(), hub.getName(), hub.getAddress(), hub.getHubType());
+    private boolean isProcessing(List<HubRoute> routes) {
+        return !routes.isEmpty() && routes.stream().allMatch(HubRoute::isProcessing);
     }
+
 }

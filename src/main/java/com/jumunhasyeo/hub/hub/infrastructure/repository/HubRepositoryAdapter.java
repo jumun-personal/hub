@@ -72,6 +72,24 @@ public class HubRepositoryAdapter implements HubRepository {
     }
 
     @Override
+    public int failRouteBuildIfPending(UUID hubId) {
+        return jpaHubRepository.failRouteBuildIfPending(
+                hubId,
+                HubStatus.PENDING,
+                HubStatus.FAILED
+        );
+    }
+
+    @Override
+    public int retryRouteBuildIfFailed(UUID hubId) {
+        return jpaHubRepository.retryRouteBuildIfFailed(
+                hubId,
+                HubStatus.FAILED,
+                HubStatus.PENDING
+        );
+    }
+
+    @Override
     public int failIfPending(UUID hubId, LocalDateTime deletedAt, Long deletedBy) {
         return jpaHubRepository.failIfPending(
                 hubId,

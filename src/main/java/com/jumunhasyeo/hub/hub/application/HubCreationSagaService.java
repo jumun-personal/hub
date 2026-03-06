@@ -41,6 +41,24 @@ public class HubCreationSagaService {
     }
 
     @Transactional
+    public void failRouteBuild(UUID hubId, String reason) {
+        int updated = hubRepository.failRouteBuildIfPending(hubId);
+        if (updated != 1) {
+            throw new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION);
+        }
+        log.warn("Hub route build failed. hubId={}, reason={}", hubId, reason);
+    }
+
+    @Transactional
+    public void retryRouteBuild(UUID hubId) {
+        int updated = hubRepository.retryRouteBuildIfFailed(hubId);
+        if (updated != 1) {
+            throw new BusinessException(ErrorCode.PROCESSING_CONFLICT_EXCEPTION);
+        }
+        log.info("Hub route build retry requested. hubId={}", hubId);
+    }
+
+    @Transactional
     public void compensate(UUID hubId, String reason) {
         Hub hub = hubRepository.findByIdIncludingDeleted(hubId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.HUB_NOT_FOUND));

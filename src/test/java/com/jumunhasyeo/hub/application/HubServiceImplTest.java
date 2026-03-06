@@ -20,9 +20,10 @@ import com.jumunhasyeo.hub.hub.domain.repository.HubRepositoryCustom;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hub.presentation.dto.HubSearchCondition;
-import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteBuildJobService;
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,8 +59,15 @@ public class HubServiceImplTest {
     private HubEventPublisher eventPublisher;
     @Mock
     private HubRouteService hubRouteService;
+    @Mock
+    private HubRouteBuildJobService hubRouteBuildJobService;
     @InjectMocks
     private HubServiceImpl hubService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(hubRouteService.prepareRoutesForBuildJob(any(UUID.class))).thenReturn(1);
+    }
 
     private static Hub createHub(UUID hubId) {
         return Hub.builder()
@@ -86,23 +95,20 @@ public class HubServiceImplTest {
     }
 
     @Test
-    @DisplayName("hub 생성 시 경로 skeleton을 준비하고 완료 이벤트는 발행하지 않는다")
-    void createHub_ShouldPrepareRouteSkeletonsWithoutPublishingCompletedEvent() {
+    @DisplayName("hub 생성 요청에서는 경로가 완료되기 전 HubCreatedEvent를 발행하지 않는다")
+    void createHub_doesNotPublishCreatedEventBeforeRouteBuildCompletes() {
         // given
-        CreateHubCommand command = CreateHubCommand.createCenter("이름", "주소", 12.7, 12.7, HubType.CENTER);
 
-        //when
+        CreateHubCommand command = CreateHubCommand.createCenter("이름", "주소", 12.7, 12.7, HubType.CENTER);
         hubService.create(command);
 
         //then
-        verify(hubRepository).flush();
-        verify(hubRouteService).buildRoutesForNewHub(any(BuildRouteCommand.class));
         verify(eventPublisher, never()).publishEvent(any(HubCreatedEvent.class));
     }
 
     @Test
-    @DisplayName("hub 생성 요청은 지도 Provider 상태와 무관하게 경로 skeleton까지 저장한다")
-    void create_doesNotDependOnRouteProviderAvailability() {
+    @DisplayName("지도 Provider 상태와 무관하게 hub 생성과 Job 요청을 저장한다")
+    void create_whenRouteProvidersUnavailable_stillRequestsRouteBuildJob() {
         // given
         CreateHubCommand command = CreateHubCommand.createCenter("이름", "주소", 12.7, 12.7, HubType.CENTER);
 
@@ -112,7 +118,9 @@ public class HubServiceImplTest {
         // then
         verify(hubRepository).save(any(Hub.class));
         verify(hubRepository).flush();
-        verify(hubRouteService).buildRoutesForNewHub(any(BuildRouteCommand.class));
+        verify(hubRouteBuildJobService).lockTopology();
+        verify(hubRouteService).prepareRoutesForBuildJob(any(UUID.class));
+        verify(hubRouteBuildJobService).request(any(Hub.class), any(Integer.class));
         verify(eventPublisher, never()).publishEvent(any(HubCreatedEvent.class));
     }
 
@@ -251,8 +259,8 @@ public class HubServiceImplTest {
     }
 
     @Test
-    @DisplayName("지점 허브 생성 시 centerHubId를 포함해 경로 skeleton을 준비한다.")
-    void create_BranchHub_ShouldPrepareRouteSkeletonsWithCenterHubId() {
+    @DisplayName("지점 허브 생성 요청에서는 경로가 완료되기 전 HubCreatedEvent를 발행하지 않는다")
+    void createBranchHub_doesNotPublishCreatedEventBeforeRouteBuildCompletes() {
         //given
         UUID centerHubId = UUID.randomUUID();
         Hub centerHub = createHub(centerHubId);
@@ -266,17 +274,12 @@ public class HubServiceImplTest {
         hubService.create(command);
 
         //then
-        ArgumentCaptor<BuildRouteCommand> commandCaptor = ArgumentCaptor.forClass(BuildRouteCommand.class);
-        verify(hubRouteService).buildRoutesForNewHub(commandCaptor.capture());
-        BuildRouteCommand capturedCommand = commandCaptor.getValue();
-        assertThat(capturedCommand.centerHubId()).isEqualTo(centerHubId);
-        assertThat(capturedCommand.type()).isEqualTo(HubType.BRANCH);
         verify(eventPublisher, never()).publishEvent(any(HubCreatedEvent.class));
     }
 
     @Test
-    @DisplayName("중앙 허브 생성 시 centerHubId 없이 경로 skeleton을 준비한다.")
-    void create_CenterHub_ShouldPrepareRouteSkeletonsWithoutCenterHubId() {
+    @DisplayName("중앙 허브 생성 요청에서는 경로가 완료되기 전 HubCreatedEvent를 발행하지 않는다")
+    void createCenterHub_doesNotPublishCreatedEventBeforeRouteBuildCompletes() {
         //given
         CreateHubCommand command = CreateHubCommand.createCenter(
                 "서울 중앙 허브", "서울시 송파구", 37.5, 127.0, HubType.CENTER
@@ -286,11 +289,6 @@ public class HubServiceImplTest {
         hubService.create(command);
 
         //then
-        ArgumentCaptor<BuildRouteCommand> commandCaptor = ArgumentCaptor.forClass(BuildRouteCommand.class);
-        verify(hubRouteService).buildRoutesForNewHub(commandCaptor.capture());
-        BuildRouteCommand capturedCommand = commandCaptor.getValue();
-        assertThat(capturedCommand.centerHubId()).isNull();
-        assertThat(capturedCommand.type()).isEqualTo(HubType.CENTER);
         verify(eventPublisher, never()).publishEvent(any(HubCreatedEvent.class));
     }
 

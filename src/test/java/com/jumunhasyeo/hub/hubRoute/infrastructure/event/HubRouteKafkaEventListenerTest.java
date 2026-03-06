@@ -7,7 +7,6 @@ import com.jumunhasyeo.hub.hub.domain.event.HubCreatedEvent;
 import com.jumunhasyeo.hub.hub.domain.event.HubDeletedEvent;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,21 +64,16 @@ public class HubRouteKafkaEventListenerTest {
     }
 
     @Test
-    @DisplayName("경로 쌍 생성 요청 이벤트를 처리할 수 있다.")
-    void dispatch_HubRouteBuildRequestedEvent_success() throws Exception {
+    @DisplayName("경로 쌍 생성 요청 이벤트는 DB 스케줄러 전환 후 무시한다.")
+    void dispatch_HubRouteBuildRequestedEvent_ignored() throws Exception {
         // given
         String payload = "{\"hubId\":\"123\"}";
-        HubRouteBuildRequestedEvent event = new HubRouteBuildRequestedEvent(
-                UUID.randomUUID(),
-                java.util.List.of(UUID.randomUUID(), UUID.randomUUID())
-        );
-        given(objectMapper.readValue(payload, HubRouteBuildRequestedEvent.class)).willReturn(event);
 
         // when
-        hubRouteKafkaEventListener.dispatch(payload, HubRouteBuildRequestedEvent.class.getSimpleName());
+        hubRouteKafkaEventListener.dispatch(payload, "HubRouteBuildRequestedEvent");
 
         // then
-        then(hubRouteEventHandler).should().routeBuildRequested(event);
+        then(hubRouteEventHandler).shouldHaveNoMoreInteractions();
     }
 
     @Test
@@ -93,8 +87,7 @@ public class HubRouteKafkaEventListenerTest {
         hubRouteKafkaEventListener.dispatch(payload, simpleClassName);
 
         //then
-        then(hubRouteEventHandler).should(never()).hubDeleted(any());
-        then(hubRouteEventHandler).should(never()).routeBuildRequested(any());
+        then(hubRouteEventHandler).shouldHaveNoInteractions();
     }
 
     @Test
@@ -102,8 +95,7 @@ public class HubRouteKafkaEventListenerTest {
     void listen_WhenHeaderMissing_skip() throws Exception {
         hubRouteKafkaEventListener.listen("{}", null);
 
-        then(hubRouteEventHandler).should(never()).hubDeleted(any());
-        then(hubRouteEventHandler).should(never()).routeBuildRequested(any());
+        then(hubRouteEventHandler).shouldHaveNoInteractions();
     }
 
     @Test
@@ -111,8 +103,7 @@ public class HubRouteKafkaEventListenerTest {
     void listen_WhenUnsupportedType_skip() throws Exception {
         hubRouteKafkaEventListener.listen("{}", "UNKNOWN");
 
-        then(hubRouteEventHandler).should(never()).hubDeleted(any());
-        then(hubRouteEventHandler).should(never()).routeBuildRequested(any());
+        then(hubRouteEventHandler).shouldHaveNoInteractions();
     }
 
     private static Hub createHub() {

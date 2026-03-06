@@ -1,5 +1,6 @@
 package com.jumunhasyeo.common.scheduler;
 
+import com.jumunhasyeo.hub.hubRoute.application.command.RoutePairBuildTarget;
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilityService;
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteWorkLifecycle;
@@ -13,10 +14,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -27,7 +28,6 @@ class HubRouteBuildSchedulerTest {
 
     @Mock
     private HubRouteService hubRouteService;
-
     @Mock
     private RouteProviderAvailabilityService routeProviderAvailabilityService;
     @Mock
@@ -42,40 +42,49 @@ class HubRouteBuildSchedulerTest {
                 routeProviderAvailabilityService,
                 routeWorkLifecycle
         );
-        ReflectionTestUtils.setField(scheduler, "batchSize", 10);
         ReflectionTestUtils.setField(scheduler, "staleProcessingTimeout", "5m");
     }
 
     @Test
-    @DisplayName("지도 Provider 장애 게이트가 켜져 있으면 신규 경로 claim을 수행하지 않는다")
-    void buildPendingRoutes_whenProvidersUnavailable_skipsClaim() {
-        // given
+    @DisplayName("지도 Provider 장애 게이트가 켜져 있으면 작업 조회를 건너뛴다")
+    void buildPendingRoutes_whenProvidersUnavailable_skipsLookup() {
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(true);
 
-        // when
         scheduler.buildPendingRoutes();
 
-        // then
-        then(hubRouteService).should(never()).findRouteBuildRecoveryTargets(anyInt(), any(Duration.class));
+        then(hubRouteService).shouldHaveNoInteractions();
         then(routeWorkLifecycle).shouldHaveNoInteractions();
     }
 
     @Test
-    @DisplayName("재시도 시간이 지난 경로 쌍을 복구 처리기에 전달한다")
-    void buildPendingRoutes_whenRecoveryIsDue_delegatesRoutePair() {
-        // given
-        UUID routeId = UUID.randomUUID();
-        List<UUID> routePairIds = List.of(routeId, UUID.randomUUID());
+    @DisplayName("한 번의 스케줄 실행에서 경로쌍 하나를 동기로 끝까지 처리한다")
+    void buildPendingRoutes_processesOnePairSynchronously() {
+        UUID representativeRouteId = UUID.randomUUID();
+        List<UUID> routeIds = List.of(representativeRouteId, UUID.randomUUID());
+        RoutePairBuildTarget target = new RoutePairBuildTarget(
+                routeIds, UUID.randomUUID(), UUID.randomUUID(), null, null, null, 0
+        );
         given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
-        given(hubRouteService.findRouteBuildRecoveryTargets(eq(10), eq(Duration.ofMinutes(5))))
-                .willReturn(List.of(routeId));
-        given(hubRouteService.findRoutePairIds(routeId)).willReturn(routePairIds);
+        given(hubRouteService.findRunningJobBuildTargets(1, Duration.ofMinutes(5)))
+                .willReturn(List.of(representativeRouteId));
+        given(hubRouteService.findRoutePairIds(representativeRouteId)).willReturn(routeIds);
+        given(routeWorkLifecycle.claimBuild(routeIds)).willReturn(Optional.of(target));
 
-        // when
         scheduler.buildPendingRoutes();
 
-        // then
-        then(routeWorkLifecycle).should().build(routePairIds);
+        then(routeWorkLifecycle).should().build(target);
     }
 
+    @Test
+    @DisplayName("실행할 경로가 없으면 선점과 처리를 하지 않는다")
+    void buildPendingRoutes_whenNoTargets_doesNothing() {
+        given(routeProviderAvailabilityService.isAllProvidersUnavailable()).willReturn(false);
+        given(hubRouteService.findRunningJobBuildTargets(1, Duration.ofMinutes(5)))
+                .willReturn(List.of());
+
+        scheduler.buildPendingRoutes();
+
+        then(hubRouteService).should(never()).findRoutePairIds(any());
+        then(routeWorkLifecycle).shouldHaveNoInteractions();
+    }
 }

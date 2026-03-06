@@ -55,11 +55,19 @@ public final class HubCreatedEvent extends HubDomainEvent {
         if (hub.isCenterHub()) {
             return centerHub(hub);
         }
+
         UUID centerHubId = hub.getCenterHubs().stream()
-                .findFirst()
                 .map(Hub::getHubId)
-                .orElse(null);
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Branch hub must be connected to a center hub. hubId=" + hub.getHubId()
+                ));
         return branchHub(hub, centerHubId);
+    }
+
+    @Override
+    public String getEventKey() {
+        return "HubCreatedEvent:" + hubId;
     }
 
 }

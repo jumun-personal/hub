@@ -19,5 +19,7 @@ public interface HubRepository {
     List<Hub> findAllByHubType(HubType type);
     List<Hub> findAll();
     int completeIfPending(UUID hubId);
+    int failRouteBuildIfPending(UUID hubId);
+    int retryRouteBuildIfFailed(UUID hubId);
     int failIfPending(UUID hubId, LocalDateTime deletedAt, Long deletedBy);
 }

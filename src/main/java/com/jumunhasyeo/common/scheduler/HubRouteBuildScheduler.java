@@ -5,6 +5,7 @@ import com.jumunhasyeo.hub.hubRoute.application.service.RouteProviderAvailabilit
 import com.jumunhasyeo.hub.hubRoute.application.service.RouteWorkLifecycle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.convert.DurationStyle;
@@ -24,27 +25,32 @@ public class HubRouteBuildScheduler {
     private final HubRouteService hubRouteService;
     private final RouteProviderAvailabilityService routeProviderAvailabilityService;
     private final RouteWorkLifecycle routeWorkLifecycle;
-
-    @Value("${hub.route.build.batch-size:10}")
-    private int batchSize;
-
-    @Value("${hub.route.build.stale-processing-timeout:PT5M}")
+    @Value("${hub.route.build.stale-processing-timeout:PT7M}")
     private String staleProcessingTimeout;
 
-    @Scheduled(fixedDelayString = "${hub.route.build.fixed-delay-ms:1000}")
+    @Scheduled(fixedDelayString = "${hub.route.build.fixed-delay-ms:500}")
+    @SchedulerLock(
+            name = "hubRouteBuildDispatch",
+            lockAtLeastFor = "PT0.5S",
+            lockAtMostFor = "${hub.route.build.lock-at-most-for:PT6M}"
+    )
     public void buildPendingRoutes() {
         if (routeProviderAvailabilityService.isAllProvidersUnavailable()) {
             log.info("Skip hub route build. route providers are unavailable.");
             return;
         }
 
-        List<UUID> routeIds = hubRouteService.findRouteBuildRecoveryTargets(batchSize, staleProcessingTimeout());
-        for (UUID routeId : routeIds) {
-            List<UUID> routePairIds = hubRouteService.findRoutePairIds(routeId);
-            if (!routePairIds.isEmpty()) {
-                routeWorkLifecycle.build(routePairIds);
-            }
+        List<UUID> routeIds = hubRouteService.findRunningJobBuildTargets(1, staleProcessingTimeout());
+        if (routeIds.isEmpty()) {
+            return;
         }
+
+        List<UUID> routePairIds = hubRouteService.findRoutePairIds(routeIds.get(0));
+        if (routePairIds.isEmpty()) {
+            return;
+        }
+
+        routeWorkLifecycle.claimBuild(routePairIds).ifPresent(routeWorkLifecycle::build);
     }
 
     private Duration staleProcessingTimeout() {

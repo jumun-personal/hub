@@ -59,7 +59,7 @@ public abstract class CommonTestContainer {
 
         // JPA 설정
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
-        registry.add("spring.jpa.show-sql", () -> "true");
+        registry.add("spring.jpa.show-sql", () -> System.getProperty("test.jpa.showSql", "true"));
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
 
         // Redis 설정

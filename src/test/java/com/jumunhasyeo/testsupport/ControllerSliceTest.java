@@ -3,6 +3,8 @@ package com.jumunhasyeo.testsupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.company.application.CompanyService;
 import com.jumunhasyeo.hub.hub.application.HubService;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteBuildJobService;
+import com.jumunhasyeo.hub.hubRoute.application.service.HubRoutePlanningService;
 import com.jumunhasyeo.hub.hubRoute.application.service.HubRouteService;
 import com.jumunhasyeo.product.application.ProductService;
 import com.jumunhasyeo.stock.application.StockService;
@@ -24,6 +26,12 @@ public abstract class ControllerSliceTest {
 
     @MockitoBean
     protected HubRouteService hubRouteService;
+
+    @MockitoBean
+    protected HubRouteBuildJobService hubRouteBuildJobService;
+
+    @MockitoBean
+    protected HubRoutePlanningService hubRoutePlanningService;
 
     @MockitoBean
     protected ProductService productService;

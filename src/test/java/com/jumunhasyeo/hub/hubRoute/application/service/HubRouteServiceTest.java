@@ -1,6 +1,7 @@
 package com.jumunhasyeo.hub.hubRoute.application.service;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
+import com.jumunhasyeo.hub.hub.domain.entity.HubStatus;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
 import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
@@ -9,7 +10,6 @@ import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
 import com.jumunhasyeo.hub.hubRoute.application.command.BuildRouteCommand;
 import com.jumunhasyeo.hub.hubRoute.application.dto.response.HubRouteRes;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteDeletedEvent;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
 import com.jumunhasyeo.hub.hubRoute.domain.service.HubRouteDomainService;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
@@ -75,17 +75,23 @@ class HubRouteServiceTest {
     @Test
     @DisplayName("CENTER 허브 생성 시 외부 API 호출 없이 PENDING 경로 skeleton만 저장한다.")
     void build_routes_for_center_success() {
+        // given
         BuildRouteCommand command = new BuildRouteCommand(null, center1.getHubId(), center1.getName(), center1.getAddress(), HubType.CENTER);
         when(hubRepository.findByIdIncludingCreating(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRepository.findAllByHubType(HubType.CENTER)).thenReturn(List.of(center1, center2));
         when(hubRouteRepository.findByStartHubOrEndHub(center1, center1)).thenReturn(List.of());
 
+        // when
         hubRouteService.buildRoutesForNewHub(command);
 
-        verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(2)));
-        verify(hubRouteEventPublisher).publishRouteBuildRequested(argThat(events ->
-                events.size() == 1 && events.get(0).getRouteIds().size() == 2
-        ));
+        // then
+        ArgumentCaptor<Set<HubRoute>> routesCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(hubRouteRepository).insertIgnore(routesCaptor.capture());
+        assertThat(routesCaptor.getValue()).hasSize(2).allSatisfy(route -> {
+            assertThat(route.getStatus()).isEqualTo(com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus.PENDING);
+            assertThat(route.getRouteWeight()).isNull();
+            assertThat(route.getNextRetryAt()).isNotNull();
+        });
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
         verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
@@ -95,7 +101,6 @@ class HubRouteServiceTest {
     void build_routes_for_branch_success() {
         BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
         when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
-        when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRouteRepository.findByStartHubOrEndHub(branch, branch)).thenReturn(List.of());
 
         hubRouteService.buildRoutesForNewHub(command);
@@ -121,7 +126,7 @@ class HubRouteServiceTest {
 
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
-        verify(hubRouteEventPublisher).publishRouteBuildCompleted(command);
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
@@ -135,7 +140,6 @@ class HubRouteServiceTest {
                         HubRoute.skeleton(center1.getHubId(), center1, center2),
                         HubRoute.skeleton(center1.getHubId(), center2, center1)
                 ));
-        when(hubRouteRepository.hasIncompleteRoutes(center1.getHubId())).thenReturn(true);
 
         hubRouteService.buildRoutesForNewHub(command);
 
@@ -149,7 +153,6 @@ class HubRouteServiceTest {
     void build_routes_for_branch_skipsExistingTwoWayRoutes() {
         BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
         when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
-        when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRouteRepository.findByStartHubOrEndHub(branch, branch))
                 .thenReturn(List.of(
                         HubRoute.ofSelfId(UUID.randomUUID(), branch, center1, RouteWeight.of(BigDecimal.valueOf(7.2), 19)),
@@ -160,7 +163,7 @@ class HubRouteServiceTest {
 
         verify(hubRouteRepository).insertIgnore(argThat(hasRouteCount(0)));
         verify(hubRouteEventPublisher, never()).publishRouteCreatedEvent(any());
-        verify(hubRouteEventPublisher).publishRouteBuildCompleted(command);
+        verify(hubRouteEventPublisher, never()).publishRouteBuildCompleted(any());
     }
 
     @Test
@@ -186,7 +189,6 @@ class HubRouteServiceTest {
         BuildRouteCommand command = new BuildRouteCommand(center1.getHubId(), branch.getHubId(), branch.getName(), branch.getAddress(), HubType.BRANCH);
         HubRoute existingRoute = HubRoute.ofSelfId(UUID.randomUUID(), branch, center1, RouteWeight.of(BigDecimal.valueOf(7.2), 19));
         when(hubRepository.findByIdIncludingCreating(branch.getHubId())).thenReturn(Optional.of(branch));
-        when(hubRepository.findById(center1.getHubId())).thenReturn(Optional.of(center1));
         when(hubRouteRepository.findByStartHubOrEndHub(branch, branch)).thenReturn(List.of(existingRoute));
 
         hubRouteService.buildRoutesForNewHub(command);
@@ -212,8 +214,7 @@ class HubRouteServiceTest {
     @Test
     @DisplayName("삭제 대상 라우트가 없으면 저장/삭제 이벤트를 발행하지 않는다.")
     void delete_routes_no_routes() {
-        when(hubRepository.findByIdIncludingDeleted(center1.getHubId())).thenReturn(Optional.of(center1));
-        when(hubRouteRepository.findByStartHubOrEndHub(center1, center1)).thenReturn(List.of());
+        when(hubRouteRepository.bulkSoftDeleteByHubId(center1.getHubId(), 1L)).thenReturn(0);
 
         hubRouteService.deleteRoutesForHub(center1.getHubId(), 1L);
 
@@ -224,17 +225,13 @@ class HubRouteServiceTest {
     @Test
     @DisplayName("삭제 대상 라우트가 있으면 soft delete 후 이벤트를 발행한다.")
     void delete_routes_success() {
-        HubRoute route = HubRoute.ofSelfId(UUID.randomUUID(), center1, center2, RouteWeight.of(BigDecimal.valueOf(10), 20));
-        when(hubRepository.findByIdIncludingDeleted(center1.getHubId())).thenReturn(Optional.of(center1));
-        when(hubRouteRepository.findByStartHubOrEndHub(center1, center1)).thenReturn(List.of(route));
+        when(hubRouteRepository.bulkSoftDeleteByHubId(center1.getHubId(), 7L)).thenReturn(1);
 
         hubRouteService.deleteRoutesForHub(center1.getHubId(), 7L);
 
-        assertThat(route.getDeletedBy()).isEqualTo(7L);
-        verify(hubRouteRepository).saveAll(List.of(route));
-        ArgumentCaptor<List<HubRouteDeletedEvent>> captor = ArgumentCaptor.forClass(List.class);
-        verify(hubRouteEventPublisher).publishRouteDeletedEvent(captor.capture());
-        assertThat(captor.getValue()).hasSize(1);
+        verify(hubRouteRepository).bulkSoftDeleteByHubId(center1.getHubId(), 7L);
+        verify(hubRouteRepository, never()).saveAll(any());
+        verify(hubRouteEventPublisher, never()).publishRouteDeletedEvent(any());
     }
 
     @Test
@@ -256,6 +253,7 @@ class HubRouteServiceTest {
                 .hubId(id)
                 .name(name)
                 .hubType(type)
+                .status(HubStatus.COMPLETE)
                 .address(Address.of("주소", Coordinate.of(lat, lng)))
                 .centerHubRelations(new HashSet<>())
                 .branchHubRelations(new HashSet<>())

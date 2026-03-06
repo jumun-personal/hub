@@ -35,18 +35,19 @@ public class RouteWorkLifecycle {
     @Value("${hub.route.refresh.non-retryable-delay:30m}")
     private String nonRetryableRefreshDelay;
 
-    public void build(List<UUID> routeIds) {
+    public Optional<RoutePairBuildTarget> claimBuild(final List<UUID> routeIds) {
         if (routeProviderAvailabilityService.isAllProvidersUnavailable()) {
             log.info("Skip route pair build. providers are unavailable. routeIds={}", routeIds);
-            return;
+            return Optional.empty();
         }
+        return routePairLifecycleService.claimRoutePairBuild(routeIds);
+    }
 
-        Optional<RoutePairBuildTarget> claimed = routePairLifecycleService.claimRoutePairBuild(routeIds);
-        if (claimed.isEmpty()) {
-            return;
-        }
+    public void build(final List<UUID> routeIds) {
+        claimBuild(routeIds).ifPresent(this::build);
+    }
 
-        RoutePairBuildTarget target = claimed.get();
+    public void build(final RoutePairBuildTarget target) {
         try {
             RouteWeightResult result = routeProviderResolution.resolve(toQuery(target));
             routePairLifecycleService.completeRoutePairBuild(
@@ -72,7 +73,8 @@ public class RouteWorkLifecycle {
             );
         } catch (RouteRequestRejectedException | RouteResolutionRejectedException e) {
             log.warn("Route pair build rejected permanently. routeIds={}", target.routeIds(), e);
-            routePairLifecycleService.failRoutePairBuildPermanently(target.routeIds(), e.getMessage());
+            routePairLifecycleService.failRoutePairBuildPermanently(
+                    target.routeIds(), e.getMessage());
         } catch (RuntimeException e) {
             log.warn("Route pair build failed. routeIds={}", target.routeIds(), e);
             routePairLifecycleService.failRoutePairBuild(

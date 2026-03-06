@@ -2,6 +2,10 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
+      - dev
   pull_request:
     branches:
       - main
@@ -41,5 +45,5 @@ jobs:
           cp src/main/resources/application-sample.yml src/main/resources/application.yml
           echo "application.yml created from sample"
 
-      - name: /gradlew clean test -Dspring.profiles.active=test
+      - name: ./gradlew clean test -Dspring.profiles.active=test
         run: ./gradlew clean test -Dspring.profiles.active=test

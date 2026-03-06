@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.common.exception.BusinessException;
 import com.jumunhasyeo.common.exception.ErrorCode;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,9 +21,6 @@ public class OutboxPublicationService {
 
     @Value("${spring.kafka.topics.hub}")
     private String hubTopic;
-
-    @Value("${spring.kafka.topics.hub-route-build:hub-route-build}")
-    private String hubRouteBuildTopic;
 
     private final JpaOutboxRepository outboxRepository;
     private final OutboxStateTransitions outboxStateTransitions;
@@ -78,9 +74,6 @@ public class OutboxPublicationService {
     }
 
     private String topicFor(OutboxMessage event) {
-        if (HubRouteBuildRequestedEvent.class.getSimpleName().equals(event.eventName())) {
-            return hubRouteBuildTopic;
-        }
         return hubTopic;
     }
 }

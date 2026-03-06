@@ -6,19 +6,37 @@ spring:
     name: hub-route-worker
   main:
     web-application-type: none
+  cloud:
+    openfeign:
+      client:
+        config:
+          kakao-mobility-client:
+            connectTimeout: ${KAKAO_ROUTE_CONNECT_TIMEOUT_MS:1000}
+            readTimeout: ${KAKAO_ROUTE_READ_TIMEOUT_MS:4000}
+          naver-map-client:
+            connectTimeout: ${NAVER_ROUTE_CONNECT_TIMEOUT_MS:1000}
+            readTimeout: ${NAVER_ROUTE_READ_TIMEOUT_MS:4000}
 
 hub:
   api:
     events:
       enabled: false
+  outbox:
+    scheduler:
+      enabled: false
   route:
+    events:
+      enabled: false
     worker:
-      enabled: true
+      enabled: false
     refresh:
-      enabled: true
+      enabled: false
     build:
       scheduler:
         enabled: true
+      fixed-delay-ms: 500
+      lock-at-most-for: PT6M
+      stale-processing-timeout: 7m
 
 stock:
   events:

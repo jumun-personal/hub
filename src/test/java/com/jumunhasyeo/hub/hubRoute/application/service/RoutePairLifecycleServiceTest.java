@@ -2,7 +2,6 @@ package com.jumunhasyeo.hub.hubRoute.application.service;
 
 import com.jumunhasyeo.hub.hub.domain.entity.Hub;
 import com.jumunhasyeo.hub.hub.domain.entity.HubType;
-import com.jumunhasyeo.hub.hub.domain.repository.HubRepository;
 import com.jumunhasyeo.hub.hub.domain.vo.Address;
 import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import com.jumunhasyeo.hub.hubRoute.application.HubRouteEventPublisher;
@@ -12,12 +11,12 @@ import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRoute;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.HubRouteStatus;
 import com.jumunhasyeo.hub.hubRoute.domain.entity.RouteProvider;
 import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteRepository;
+import com.jumunhasyeo.hub.hubRoute.domain.repository.HubRouteBuildJobRepository.HubRouteBuildJobCounter;
 import com.jumunhasyeo.hub.hubRoute.domain.vo.RouteWeight;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -35,18 +34,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class RoutePairLifecycleServiceTest {
 
     @Mock
-    private HubRepository hubRepository;
-    @Mock
     private HubRouteRepository hubRouteRepository;
     @Mock
     private HubRouteEventPublisher hubRouteEventPublisher;
+    @Mock
+    private HubRouteBuildJobService hubRouteBuildJobService;
+    @Mock
+    private HubRoutePlanningService hubRoutePlanningService;
 
     private RoutePairLifecycleService service;
     private Hub center1;
@@ -54,8 +55,13 @@ class RoutePairLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RoutePairLifecycleService(hubRepository, hubRouteRepository, hubRouteEventPublisher);
-        ReflectionTestUtils.setField(service, "eventRecoveryDelay", "5m");
+        service = new RoutePairLifecycleService(
+                hubRouteRepository,
+                hubRouteEventPublisher,
+                hubRouteBuildJobService,
+                hubRoutePlanningService
+        );
+        ReflectionTestUtils.setField(service, "staleProcessingTimeout", "5m");
         ReflectionTestUtils.setField(service, "routeRefreshInterval", "5m");
         ReflectionTestUtils.setField(service, "fallbackReconcileDelay", "1m");
         center1 = hub("센터1", 37.5, 127.0);
@@ -95,6 +101,8 @@ class RoutePairLifecycleServiceTest {
         // then
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().purpose()).isEqualTo(RoutePurpose.CENTER_TO_CENTER);
+        assertThat(outbound.isProcessing()).isTrue();
+        assertThat(inbound.isProcessing()).isTrue();
         assertThat(outbound.getStatus()).isEqualTo(HubRouteStatus.PROCESSING);
         assertThat(inbound.getStatus()).isEqualTo(HubRouteStatus.PROCESSING);
         then(hubRouteRepository).should().saveAll(List.of(outbound, inbound));
@@ -144,29 +152,53 @@ class RoutePairLifecycleServiceTest {
     }
 
     @Test
-    @DisplayName("경로 쌍 완료 시 허브 잠금을 먼저 획득하고 새로 완료된 경로만 생성 이벤트로 발행한다")
+    @DisplayName("이미 완료된 경로 쌍의 중복 결과는 Job 카운터를 다시 반영하지 않는다")
+    void completeRoutePairBuild_whenAlreadyCompleted_ignoresDuplicateResult() {
+        // given
+        HubRoute outbound = route(center1, center2);
+        HubRoute inbound = route(center2, center1);
+        outbound.claimProcessing();
+        inbound.claimProcessing();
+        List<UUID> routeIds = List.of(outbound.getRouteId(), inbound.getRouteId());
+        given(hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds))
+                .willReturn(List.of(outbound, inbound), List.of(outbound, inbound));
+        HubRouteBuildJobCounter counter = new HubRouteBuildJobCounter(center1.getHubId(), 0, 0);
+        given(hubRouteBuildJobService.completePair(center1.getHubId())).willReturn(Optional.of(counter));
+
+        // when
+        service.completeRoutePairBuild(routeIds, weight(), RouteProvider.KAKAO, false);
+        service.completeRoutePairBuild(routeIds, weight(), RouteProvider.KAKAO, false);
+
+        // then
+        assertThat(outbound.getStatus()).isEqualTo(HubRouteStatus.COMPLETE);
+        assertThat(inbound.getStatus()).isEqualTo(HubRouteStatus.COMPLETE);
+        then(hubRouteRepository).should(times(1)).saveAll(List.of(outbound, inbound));
+        then(hubRouteBuildJobService).should(times(1)).completePair(center1.getHubId());
+    }
+
+    @Test
+    @DisplayName("경로 쌍 완료 시 새로 완료된 경로를 저장하고 Job 카운터를 한 번 감소시킨다")
     void completeRoutePairBuildLocksHubAndPublishesOnlyNewCompletion() {
         // given
         HubRoute pending = route(center1, center2);
-        HubRoute completed = route(center2, center1);
-        completed.complete(weight());
-        List<UUID> routeIds = List.of(pending.getRouteId(), completed.getRouteId());
+        HubRoute pendingReverse = route(center2, center1);
+        pending.claimProcessing();
+        pendingReverse.claimProcessing();
+        List<UUID> routeIds = List.of(pending.getRouteId(), pendingReverse.getRouteId());
         given(hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds))
-                .willReturn(List.of(pending, completed));
-        given(hubRouteRepository.hasIncompleteRoutes(center1.getHubId())).willReturn(false);
-        given(hubRepository.findByIdIncludingCreating(center1.getHubId())).willReturn(Optional.of(center1));
+                .willReturn(List.of(pending, pendingReverse));
+        HubRouteBuildJobCounter counter = new HubRouteBuildJobCounter(center1.getHubId(), 0, 0);
+        given(hubRouteBuildJobService.completePair(center1.getHubId())).willReturn(Optional.of(counter));
 
         // when
         service.completeRoutePairBuild(routeIds, weight(), RouteProvider.KAKAO, false);
 
         // then
         assertThat(pending.isComplete()).isTrue();
-        then(hubRouteRepository).should().saveAll(List.of(pending));
-        then(hubRouteEventPublisher).should().publishRouteCreatedEvent(argThat(events -> events.size() == 1));
-        then(hubRouteEventPublisher).should().publishRouteBuildCompleted(any());
-        InOrder order = inOrder(hubRouteRepository);
-        order.verify(hubRouteRepository).lockBuildHub(center1.getHubId());
-        order.verify(hubRouteRepository).hasIncompleteRoutes(center1.getHubId());
+        then(hubRouteRepository).should().saveAll(List.of(pending, pendingReverse));
+        then(hubRouteEventPublisher).should().publishRouteCreatedEvent(argThat(events -> events.size() == 2));
+        then(hubRouteBuildJobService).should().completePair(center1.getHubId());
+        then(hubRoutePlanningService).should().finalizeIfTerminal(counter, "one or more hub routes failed");
     }
 
     @Test
@@ -176,8 +208,12 @@ class RoutePairLifecycleServiceTest {
         HubRoute outbound = route(center1, center2);
         HubRoute inbound = route(center2, center1);
         List<UUID> routeIds = List.of(outbound.getRouteId(), inbound.getRouteId());
+        outbound.claimProcessing();
+        inbound.claimProcessing();
         given(hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds))
                 .willReturn(List.of(outbound, inbound));
+        HubRouteBuildJobCounter counter = new HubRouteBuildJobCounter(center1.getHubId(), 0, 1);
+        given(hubRouteBuildJobService.failPair(center1.getHubId(), "map down")).willReturn(Optional.of(counter));
 
         // when
         service.failRoutePairBuild(routeIds, "map down", 1, Duration.ofSeconds(30));
@@ -186,7 +222,32 @@ class RoutePairLifecycleServiceTest {
         assertThat(outbound.getStatus()).isEqualTo(HubRouteStatus.FAILED);
         assertThat(inbound.getStatus()).isEqualTo(HubRouteStatus.FAILED);
         then(hubRouteRepository).should().saveAll(List.of(outbound, inbound));
-        then(hubRouteEventPublisher).should().publishRouteBuildFailed(center1.getHubId(), "map down");
+        then(hubRouteBuildJobService).should().failPair(center1.getHubId(), "map down");
+        then(hubRoutePlanningService).should().finalizeIfTerminal(counter, "map down");
+    }
+
+    @Test
+    @DisplayName("한 경로 쌍이 최종 실패해도 다른 경로 쌍이 처리 중이면 실패 이벤트를 기다린다")
+    void failRoutePairBuild_whenOtherPairsAreActive_defersFailureEvent() {
+        // given
+        HubRoute outbound = route(center1, center2);
+        HubRoute inbound = route(center2, center1);
+        outbound.claimProcessing();
+        inbound.claimProcessing();
+        List<UUID> routeIds = List.of(outbound.getRouteId(), inbound.getRouteId());
+        given(hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds))
+                .willReturn(List.of(outbound, inbound));
+        HubRouteBuildJobCounter counter = new HubRouteBuildJobCounter(center1.getHubId(), 1, 1);
+        given(hubRouteBuildJobService.failPair(center1.getHubId(), "map down")).willReturn(Optional.of(counter));
+
+        // when
+        service.failRoutePairBuild(routeIds, "map down", 1, Duration.ofSeconds(30));
+
+        // then
+        assertThat(outbound.getStatus()).isEqualTo(HubRouteStatus.FAILED);
+        assertThat(inbound.getStatus()).isEqualTo(HubRouteStatus.FAILED);
+        then(hubRouteEventPublisher).should(never()).publishRouteBuildFailed(any(), any());
+        then(hubRoutePlanningService).should().finalizeIfTerminal(counter, "map down");
     }
 
     @Test
@@ -196,9 +257,12 @@ class RoutePairLifecycleServiceTest {
         HubRoute outbound = route(center1, center2);
         HubRoute inbound = route(center2, center1);
         List<UUID> routeIds = List.of(outbound.getRouteId(), inbound.getRouteId());
+        outbound.claimProcessing();
+        inbound.claimProcessing();
         given(hubRouteRepository.findAllByIdsWithHubsForUpdate(routeIds))
                 .willReturn(List.of(outbound, inbound));
-        given(hubRouteRepository.hasIncompleteRoutes(center1.getHubId())).willReturn(true);
+        HubRouteBuildJobCounter counter = new HubRouteBuildJobCounter(center1.getHubId(), 1, 0);
+        given(hubRouteBuildJobService.completePair(center1.getHubId())).willReturn(Optional.of(counter));
         LocalDateTime before = LocalDateTime.now().plusMinutes(1).minusSeconds(1);
 
         // when
@@ -211,6 +275,7 @@ class RoutePairLifecycleServiceTest {
         assertThat(outbound.getResolvedProvider()).isEqualTo(RouteProvider.NAVER);
         assertThat(outbound.getResolvedByFallback()).isTrue();
         then(hubRouteEventPublisher).should(never()).publishRouteBuildCompleted(any());
+        then(hubRoutePlanningService).should().finalizeIfTerminal(counter, "one or more hub routes failed");
     }
 
     private HubRoute route(Hub start, Hub end) {

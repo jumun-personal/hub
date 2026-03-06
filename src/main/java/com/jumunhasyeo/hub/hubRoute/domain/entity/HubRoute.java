@@ -103,6 +103,7 @@ public class HubRoute extends BaseEntity {
                 .endHub(endHub)
                 .status(HubRouteStatus.PENDING)
                 .retryCount(0)
+                .nextRetryAt(LocalDateTime.now())
                 .build();
     }
 
@@ -124,6 +125,10 @@ public class HubRoute extends BaseEntity {
         this.status = HubRouteStatus.PROCESSING;
         this.nextRetryAt = null;
         this.errorMessage = null;
+    }
+
+    public boolean isProcessing() {
+        return HubRouteStatus.PROCESSING.equals(this.status);
     }
 
     public void scheduleRecovery(LocalDateTime recoveryAt) {

@@ -2,8 +2,6 @@ package com.jumunhasyeo.hub.hub.infrastructure.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jumunhasyeo.hub.hub.application.HubCreationSagaService;
-import com.jumunhasyeo.hub.hub.domain.entity.HubType;
-import com.jumunhasyeo.hub.hubRoute.domain.event.HubRouteBuildCompletedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,10 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.UUID;
-
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
@@ -31,17 +26,14 @@ class HubKafkaEventListenerTest {
     private HubKafkaEventListener hubKafkaEventListener;
 
     @Test
-    @DisplayName("HubRouteBuildCompletedEvent를 처리하면 saga complete가 호출된다")
-    void dispatch_buildCompleted_callsComplete() throws Exception {
+    @DisplayName("HubRouteBuildCompletedEvent는 DB Job 전환 이후 saga를 호출하지 않고 skip 한다")
+    void dispatch_buildCompleted_skipsLegacyEvent() throws Exception {
         String payload = "{}";
         String simpleClassName = "HubRouteBuildCompletedEvent";
-        HubRouteBuildCompletedEvent event =
-                new HubRouteBuildCompletedEvent(UUID.randomUUID(), UUID.randomUUID(), HubType.CENTER);
-        given(objectMapper.readValue(payload, HubRouteBuildCompletedEvent.class)).willReturn(event);
 
         hubKafkaEventListener.dispatch(payload, simpleClassName);
 
-        then(hubCreationSagaService).should().complete(event.getHubId());
+        then(hubCreationSagaService).shouldHaveNoInteractions();
     }
 
     @Test

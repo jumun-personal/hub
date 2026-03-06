@@ -9,7 +9,12 @@ hub:
   api:
     events:
       enabled: true
+  outbox:
+    scheduler:
+      enabled: true
   route:
+    events:
+      enabled: true
     worker:
       enabled: false
     refresh:

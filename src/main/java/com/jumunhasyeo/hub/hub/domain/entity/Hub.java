@@ -8,6 +8,7 @@ import com.jumunhasyeo.hub.hub.domain.vo.Coordinate;
 import io.micrometer.common.util.StringUtils;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.domain.Persistable;
 
 import java.util.HashSet;
 import java.util.Optional;
@@ -30,10 +31,9 @@ import static com.jumunhasyeo.hub.hub.domain.entity.HubType.CENTER;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class Hub extends BaseEntity {
+public class Hub extends BaseEntity implements Persistable<UUID> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "hub_id", columnDefinition = "UUID")
     private UUID hubId;
 
@@ -67,6 +67,7 @@ public class Hub extends BaseEntity {
     private Set<HubRelation> branchHubRelations = new HashSet<>();
 
     private Hub(String name, Address address, HubType hubType) {
+        this.hubId = UUID.randomUUID();
         this.name = name;
         this.address = address;
         this.hubType = hubType;
@@ -163,6 +164,23 @@ public class Hub extends BaseEntity {
 
     public Coordinate getCoordinate() {
         return this.address.getCoordinate();
+    }
+
+    @PrePersist
+    void assignId() {
+        if (hubId == null) {
+            hubId = UUID.randomUUID();
+        }
+    }
+
+    @Override
+    public UUID getId() {
+        return hubId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return getCreatedAt() == null;
     }
 
     private static void validate(String name, Address address) {
