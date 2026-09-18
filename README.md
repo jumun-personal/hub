@@ -2,7 +2,7 @@
 
 - 범위: 물류 허브·허브 간 이동 경로·상품 재고 관리
 - 담당: Hub·HubRoute 생성·갱신 파이프라인
-- 구현: DB Job 기반 비동기 처리. 장애·재시도 흐름 관리
+- 구현: DB Job 기반 비동기 처리. 장애·재시도·이벤트 전달 흐름 관리
 - 스택: Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Redis 7 · Kafka
 
 ## Hub 경로 생성 아키텍처
@@ -11,17 +11,18 @@
 
 ```mermaid
 flowchart LR
-    Client["Hub 생성 요청"] --> API["hub-api"]
-    API --> DB[("PostgreSQL<br/>Hub · Job · Route · Outbox")]
-    DB --> Worker["route-worker"]
+    Client["Hub 생성 요청"] --> API["hub-api<br/>요청 접수"]
+    API --> DB[("PostgreSQL<br/>Hub · Job · Route")]
+    DB --> Worker["route-worker<br/>경로 구축"]
     Worker --> Map["지도 API"]
-    Map --> DB
-    DB --> Outbox["Outbox publisher"] --> Kafka["Kafka"]
+    Map --> Worker
+    Worker --> DB
+    DB --> Outbox["Outbox"] --> Kafka["Kafka"]
 ```
 
-- 요청: Hub·Job 저장 후 즉시 응답
-- 구축: `route-worker`가 DB 선점. Route Pair 처리
-- 전달: Hub `COMPLETE` 후 Outbox → Kafka 발행
+- 요청: Hub 생성 요청을 접수하고 작업을 등록한 뒤 응답
+- 구축: `route-worker`가 등록된 작업을 바탕으로 경로 구축
+- 전달: 처리 결과를 Outbox에 저장하고 Kafka로 발행
 
 ## 상태 한눈에 보기
 
@@ -60,23 +61,8 @@ SPRING_PROFILES_ACTIVE=dev,route-worker ./gradlew bootRun
 ```
 
 - `hub-api`: HTTP API. Hub·Job 생성. Outbox 재발행
-- `route-worker`: Planning·Build scheduler. Hub 완료 전환
-- 제약: Planning·Build는 같은 프로세스 실행. 독립 배포·스케일링 미지원
+- `route-worker`: Planning·Build scheduler. 외부 지도 API 호출. Hub 완료 전환
 
-## 상세 문서
-
-### 구현 근거와 재현 자료
-
+## 추가
 - [Job·경로·Outbox 상태 전이와 재시도](docs/hub-route-job-pipeline.md)
 - [센터·지점 경로 생성 정책](docs/hub-route-algorithm.md)
-- [측정 조건과 원본 결과](benchmark/README.md)
-
-## 검증
-
-### 테스트
-
-```bash
-./gradlew test
-```
-
-성능 측정 조건·원본 결과: [Benchmark 재현 가이드](benchmark/README.md)

@@ -1,34 +1,44 @@
 sequenceDiagram
     actor Client
-    participant Controller as HubWebController
-    participant Service as HubService
-    participant Hub as Hub (Entity)
-    participant Repository as HubRepository
+    participant API as HubWebController
+    participant HubService
+    participant DB as PostgreSQL
+    participant Planner as route-worker<br/>Planning Scheduler
+    participant Builder as route-worker<br/>Build Scheduler
+    participant Map as Kakao / Naver Map API
+    participant Outbox as Outbox Publisher
+    participant Kafka
+    participant Shipping as 배송 서비스
 
-    Client->>Controller: POST /api/v1/hub<br/>(CreateHubReq)
-    activate Controller
+    Client->>API: POST /api/v1/hubs
+    API->>HubService: create(CreateHubCommand)
+    HubService->>DB: 같은 트랜잭션<br/>Hub PENDING 저장<br/>RouteBuildJob READY 저장
+    DB-->>HubService: commit
+    HubService-->>API: HubRes(status=PENDING)
+    API-->>Client: 201 Created
 
+    Planner->>DB: READY Job 선점<br/>FOR UPDATE SKIP LOCKED<br/>READY → PLANNING
+    Planner->>DB: 대상 계산<br/>양방향 Route skeleton JDBC Batch 저장
+    Planner->>DB: PLANNING → RUNNING<br/>total / remaining counter 초기화
 
-    Note over Controller: DTO → Command 변환
-    Controller->>Service: create(CreateHubCommand)
-    activate Service
-    
-    Service->>Hub: Hub.of(name, address)
-    activate Hub
-    Note right of Hub: 생성 + 검증 + Domain Event 발행
-    Hub-->>Service: Hub
-    deactivate Hub
-    
-    Service->>Repository: save(hub)
-    activate Repository
-    Repository-->>Service: saved Hub
-    deactivate Repository
+    Builder->>DB: Route Pair 2행 선점<br/>PENDING → PROCESSING<br/>processing token 기록
+    Note over Builder,Map: 선점 트랜잭션 종료 후 외부 API 호출
+    Builder->>Map: 거리·시간 조회
+    Map-->>Builder: RouteWeight
+    Builder->>DB: Route 2행 COMPLETE<br/>remaining_count 감소
+    Builder->>DB: 최종 성공 시<br/>Job COMPLETE · Hub COMPLETE
+    DB->>Outbox: BEFORE_COMMIT<br/>HubCreatedEvent 저장
+    opt hub.route.events.enabled=true
+        DB->>Outbox: HubRouteCreatedEvent 저장
+    end
+    DB-->>Builder: commit
+    Outbox->>Kafka: AFTER_COMMIT 발행
+    Kafka-->>Shipping: Hub/Route 변경 이벤트
+    Shipping->>Shipping: 최단 경로 캐시 무효화
 
-    
-    Note over Service: Domain → DTO 변환<br/>(HubRes.from)
-    
-    Service-->>Controller: HubRes
-    deactivate Service
-    
-    Controller-->>Client: 201 Created<br/>ApiRes<HubRes>
-    deactivate Controller
+    alt 일시 오류
+        Builder->>DB: Route PENDING<br/>next_retry_at + backoff
+    else 최대 재시도 초과 또는 영구 오류
+        Builder->>DB: Route FAILED<br/>failed_count 증가
+        DB->>DB: Job FAILED · Hub FAILED
+    end

@@ -10,21 +10,30 @@
 
 ```mermaid
 sequenceDiagram
+    actor Client
     participant API as hub-api
     participant DB as PostgreSQL
-    participant Worker as route-worker
+    participant Planner as route-worker<br/>Planning scheduler
+    participant Builder as route-worker<br/>Build scheduler
     participant Map as Map Provider
     participant Publisher as Outbox Publisher
     participant Kafka
 
-    API->>DB: Hub(PENDING) + Job(READY) 저장
-    Worker->>DB: Planning scheduler가 Job 선점 (SKIP LOCKED)
-    Worker->>DB: Route skeleton(PENDING) 저장
-    Worker->>DB: Build scheduler가 경로쌍 선점 (PROCESSING)
-    Worker->>Map: 거리·시간 조회
-    Worker->>DB: 경로 COMPLETE + Job counter 갱신
-    Worker->>DB: Hub COMPLETE + Outbox 저장
-    Publisher->>Kafka: 커밋 후 HubCreatedEvent 발행
+    Client->>API: Hub 생성 요청
+    API->>DB: 같은 트랜잭션<br/>Hub(PENDING) + Job(READY) 저장
+    API-->>Client: 201 Created<br/>Hub(PENDING)
+    Planner->>DB: Job 선점<br/>READY → PLANNING<br/>FOR UPDATE SKIP LOCKED
+    Planner->>DB: Route skeleton(PENDING) JDBC Batch 저장
+    Planner->>DB: Job RUNNING + counter 초기화
+    Builder->>DB: Route Pair 선점<br/>PENDING → PROCESSING
+    Builder->>Map: 트랜잭션 종료 후 거리·시간 조회
+    Builder->>DB: 경로 COMPLETE + Job counter 갱신
+    Builder->>DB: 최종 성공 시 Hub COMPLETE + HubCreatedEvent Outbox 저장
+    opt hub.route.events.enabled=true
+        Builder->>DB: HubRouteCreatedEvent Outbox 저장
+    end
+    Publisher->>DB: 커밋 후 Outbox 선점
+    Publisher->>Kafka: 저장된 Outbox 이벤트 발행
 ```
 
 ## 처리 단위와 책임
@@ -64,14 +73,16 @@ stateDiagram-v2
     PLANNING --> PLANNING: stale claim 회수
     RUNNING --> COMPLETE: 성공 및 누락 경로 재검사 통과
     RUNNING --> FAILED: 최종 실패 경로 존재
-    FAILED --> RUNNING: 내부 retry
+    FAILED --> RUNNING: 운영자 retry<br/>실패 Route 존재
+    FAILED --> READY: 운영자 retry<br/>실패 Route 없음
 ```
 
 - `READY`: Planning 대기
 - `PLANNING`: 연결 대상 계산. Route skeleton 저장
 - `RUNNING`: Route Pair 구축
 - 종료: 전체 성공 → `COMPLETE` / 최종 실패 존재 → `FAILED`
-- 재시도: `FAILED → RUNNING`
+- 재시도: 내부 자동 재시도가 아니라 `POST /internal/api/v1/hubs/{hubId}/route-build/retry`로 운영자가 요청
+- 재시도 후 실패 Route가 있으면 `FAILED → RUNNING`, 없으면 `FAILED → READY`
 
 ### 카운터와 상태 판정
 
@@ -92,12 +103,12 @@ flowchart LR
 
 ### HubRoute
 
-- 처리 단위: 양방향 `HubRoute` 두 행. 별도 엔티티 아님
+- 저장 단위: `HubRoute` 엔티티. 처리 단위는 양방향 `HubRoute` 두 행을 묶은 Route Pair
 - 선점: 두 행에 같은 processing token 기록. 소유 token만 완료·실패 처리
 - `PENDING`: 최초·지연 재시도 대기
 - `PROCESSING`: Worker 처리 중. stale timeout 후 재선점
 - `COMPLETE`: 거리·시간·공급자 반영 완료
-- `FAILED`: 최대 재시도 초과·영구 오류. Job 재시도 시 `retry_count = 0` → `PENDING`
+- `FAILED`: 최대 재시도 초과·영구 오류. 운영자 Job 재시도 시 `retry_count = 0` → `PENDING`
 
 ### Outbox Event
 
@@ -139,7 +150,7 @@ sequenceDiagram
         Worker->>Job: failed_count 증가
         Job->>Hub: Job FAILED와 함께 Hub FAILED
     end
-    Operator->>Job: POST /internal/.../retry
+    Operator->>Job: POST /internal/api/v1/hubs/{hubId}/route-build/retry
     Job->>Hub: Hub PENDING
     Job->>Route: 실패 Route PENDING<br/>retry_count = 0
     Worker->>Route: 다음 구축 시도
@@ -147,14 +158,14 @@ sequenceDiagram
 
 - 일시 오류: Rate limit·Timeout·5xx → backoff·최대 재시도
 - Provider: Kakao 실패 → 조건에 따라 Naver fallback
-- Worker 중단: stale `PLANNING` Job·`PROCESSING` Route → 다음 Worker 선점
+- Worker 중단: stale `PLANNING` Job·`PROCESSING` Route → 다음 scheduler가 재선점
 
 ## 실행 프로필
 
 - `hub-api`: HTTP API. Hub·Job 생성. Outbox 재발행
-- `route-worker`: Planning·Build scheduler. Hub 완료 전환
+- `route-worker`: Planning·Build scheduler. 외부 지도 API 호출. Hub 완료 전환
 - 실행 단위: Planning·Build는 같은 `route-worker` 프로세스
-- 제약: 코드·scheduler 설정 수준 분리. 독립 배포·스케일링 미지원
+- 프로세스: `hub-api`와 `route-worker`는 같은 JAR을 서로 다른 Spring profile로 실행
 
 ## 전체 상태 관계도
 
@@ -172,7 +183,8 @@ flowchart LR
         JR["READY"] --> JP["PLANNING"] --> JW["RUNNING"]
         JW --> JC["COMPLETE"]
         JW --> JF["FAILED"]
-        JF -->|"retry"| JW
+        JF -->|"운영자 retry·실패 Route 존재"| JW
+        JF -->|"운영자 retry·실패 Route 없음"| JR
     end
 
     subgraph R["Route Pair = HubRoute 2행"]
@@ -196,3 +208,29 @@ flowchart LR
     HC --> OP
     OC --> Kafka
 ```
+
+## 배송 서비스 캐시 갱신 정책
+
+```mermaid
+sequenceDiagram
+    participant Hub as Hub 서비스
+    participant Outbox as Outbox publisher
+    participant Kafka
+    participant Shipping as 배송 서비스
+    participant Redis as 배송 Redis
+
+    Hub->>Outbox: HubCreatedEvent / HubDeletedEvent
+    opt hub.route.events.enabled=true
+        Hub->>Outbox: HubRouteCreatedEvent
+    end
+    Outbox->>Kafka: 커밋 후 이벤트 발행
+    Kafka->>Shipping: 경로 변경 사실 전달
+    Shipping->>Redis: DISTANCE·DURATION 경로 캐시 전체 삭제
+    Shipping->>Shipping: 다음 조회에서 최신 경로로 Cache-Aside 재계산
+```
+
+- Hub는 배송 서비스의 캐시 키·TTL·재계산 방식을 알지 않음
+- 배송 서비스는 이벤트 소비 후 캐시 무효화를 결정함
+- 현재 최단 경로 캐시는 Redis Hash에 저장하고 TTL은 30일임
+- 기본 `route-worker` 프로필은 `hub.route.events.enabled=false`이므로 Route worker의 경로 생성·갱신 이벤트는 기본적으로 Outbox에 저장되지 않음
+- `HubRouteDeletedEvent` 발행 메서드와 이벤트 리스너 테스트는 존재하지만, 현재 허브 삭제 운영 경로에서 해당 이벤트를 발행하는 호출부는 확인되지 않음
