@@ -36,8 +36,6 @@ flowchart LR
     Complete --> Outbox["Outbox"] --> Kafka["Kafka"]
 ```
 
-참고: [상세 파이프라인 문서](docs/hub-route-job-pipeline.md#전체-상태-관계도)
-
 ## 실행 구성
 
 ### 프로세스와 책임
