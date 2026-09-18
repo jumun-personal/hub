@@ -10,7 +10,7 @@
 
 ```mermaid
 sequenceDiagram
-    participant Client
+    actor Client
     participant API as hub-api
     participant DB as PostgreSQL
     participant Worker as route-worker
@@ -19,13 +19,16 @@ sequenceDiagram
     participant Kafka
 
     Client->>API: Hub 생성 요청
-    API->>DB: Hub(PENDING) + Route skeleton(PENDING) + Job(RUNNING) 저장
-    API-->>Client: 트랜잭션 커밋 후 응답
-    Worker->>DB: Build scheduler가 경로쌍 선점 (PROCESSING)
-    Worker->>Map: 거리·시간 조회
+    API->>DB: 같은 트랜잭션<br/>Hub + Route skeleton + Job 저장
+    API-->>Client: 201 Created<br/>Hub(PENDING 또는 COMPLETE)
+    Worker->>Worker: ShedLock 획득
+    Worker->>DB: 실행할 Route Pair 하나 조회·선점<br/>PENDING → PROCESSING
+    DB-->>Worker: 선점 트랜잭션 커밋
+    Worker->>Map: 트랜잭션 없이 거리·시간 조회
     Worker->>DB: 경로 COMPLETE + Job counter 갱신
-    Worker->>DB: Hub COMPLETE + Outbox 저장
-    Publisher->>Kafka: 커밋 후 HubCreatedEvent 발행
+    Worker->>DB: 최종 성공 시 Hub COMPLETE + HubCreatedEvent Outbox 저장
+    Publisher->>DB: 커밋 후 Outbox 선점
+    Publisher->>Kafka: 저장된 Outbox 이벤트 발행
 ```
 
 ## 처리 단위와 책임
@@ -60,15 +63,19 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> RUNNING: Hub·skeleton 생성
+    [*] --> COMPLETE: 생성할 경로쌍 없음
     RUNNING --> COMPLETE: 성공 및 누락 경로 재검사 통과
     RUNNING --> FAILED: 최종 실패 경로 존재
-    FAILED --> RUNNING: 내부 retry
+    FAILED --> RUNNING: 운영자 retry<br/>재처리 대상 존재
+    FAILED --> COMPLETE: 운영자 retry<br/>재처리 대상 없음
     RUNNING --> CANCELLED: Hub 삭제
 ```
 
 - `RUNNING`: Route Pair 구축
+- 생성할 Route Pair가 없으면 Job과 Hub를 요청 트랜잭션에서 바로 `COMPLETE`로 전환
 - 종료: 전체 성공 → `COMPLETE` / 최종 실패 존재 → `FAILED`
-- 재시도: `FAILED → RUNNING`
+- 재시도: 내부 자동 재시도가 아니라 `POST /internal/api/v1/hubs/{hubId}/route-build/retry`로 운영자가 요청
+- 재시도 후 처리할 Route가 있으면 `FAILED → RUNNING`, 없으면 누락 경로 재검사 후 `COMPLETE`
 
 ### 카운터와 상태 판정
 
@@ -89,12 +96,12 @@ flowchart LR
 
 ### HubRoute
 
-- 처리 단위: 양방향 `HubRoute` 두 행. 별도 엔티티 아님
-- 선점: 두 행에 같은 processing token 기록. 소유 token만 완료·실패 처리
+- 저장 단위: `HubRoute` 엔티티. 처리 단위는 양방향 `HubRoute` 두 행을 묶은 Route Pair
+- 선점: 양방향 두 행을 잠근 뒤 `PROCESSING`으로 전환. 실행별 처리 토큰은 저장하지 않음
 - `PENDING`: 최초·지연 재시도 대기
 - `PROCESSING`: Worker 처리 중. stale timeout 후 재선점
 - `COMPLETE`: 거리·시간·공급자 반영 완료
-- `FAILED`: 최대 재시도 초과·영구 오류. Job 재시도 시 `retry_count = 0` → `PENDING`
+- `FAILED`: 최대 재시도 초과·영구 오류. 운영자 Job 재시도 시 `retry_count = 0` → `PENDING`
 
 ### Outbox Event
 
@@ -104,15 +111,19 @@ flowchart LR
 - `FAILED`: 최대 3회 재시도
 - `DEAD`: 재시도 한도 소진. 운영자 확인
 
-## 동시성 제어와 멱등성
+## 동시성 제어와 중복 실행 대응
 
 ### 경로 계획 직렬화
 
 Hub 생성 트랜잭션에서 advisory lock을 획득한 뒤 최신 topology를 기준으로 Route skeleton을 저장합니다. 동시에 생성되는 Hub가 서로를 누락하지 않도록 계획 구간만 직렬화합니다.
 
-### 경로쌍 선점
+### 단일 경로쌍 처리
 
-양방향 Route Row 선점 → `PROCESSING`·processing token 기록. 동일 token만 완료·실패 처리.
+스케줄 실행은 ShedLock으로 보호합니다. 한 번의 실행에서 Route Pair 하나를 동기 처리하며, 경로 구축용 별도 스레드풀은 사용하지 않습니다. 여러 `route-worker` 인스턴스가 실행돼도 유효한 ShedLock을 가진 스케줄 실행 하나만 진행합니다.
+
+선점·결과 반영은 각각 짧은 DB 트랜잭션으로 처리합니다. 선점 시 양방향 Route 행을 `PESSIMISTIC_WRITE`로 잠그고 `PROCESSING`으로 전환합니다. 지도 API 호출 중에는 DB 트랜잭션을 유지하지 않습니다.
+
+경로 구축 기본 설정은 ShedLock lease 6분, `PROCESSING` stale 기준 7분입니다. Worker가 중단되면 stale 기준을 넘긴 Route Pair를 다음 스케줄 실행이 다시 선점합니다. 두 시간이 지난 뒤 기존 호출이 아직 진행 중이면 지도 API 요청이 겹칠 수 있습니다. 처리 토큰 없이 Route 행 잠금과 상태 전이로 결과를 반영하며, 이미 완료된 Pair의 중복 완료 결과는 Job 카운터를 다시 감소시키지 않습니다.
 
 ### 저장 멱등성
 
@@ -136,7 +147,7 @@ sequenceDiagram
         Worker->>Job: failed_count 증가
         Job->>Hub: Job FAILED와 함께 Hub FAILED
     end
-    Operator->>Job: POST /internal/.../retry
+    Operator->>Job: POST /internal/api/v1/hubs/{hubId}/route-build/retry
     Job->>Hub: Hub PENDING
     Job->>Route: 실패 Route PENDING<br/>retry_count = 0
     Worker->>Route: 다음 구축 시도
@@ -144,7 +155,7 @@ sequenceDiagram
 
 - 일시 오류: Rate limit·Timeout·5xx → backoff·최대 재시도
 - Provider: Kakao 실패 → 조건에 따라 Naver fallback
-- Worker 중단: stale `PROCESSING` Route → 다음 Worker 선점
+- Worker 중단: stale `PROCESSING` Route Pair → 다음 스케줄 실행에서 재선점
 
 ## 전체 상태 관계도
 
@@ -162,7 +173,8 @@ flowchart LR
         JW["RUNNING"]
         JW --> JC["COMPLETE"]
         JW --> JF["FAILED"]
-        JF -->|"retry"| JW
+        JF -->|"운영자 retry·재처리 대상 존재"| JW
+        JF -->|"운영자 retry·재처리 대상 없음"| JC
         JW --> JX["CANCELLED"]
     end
 
@@ -187,3 +199,24 @@ flowchart LR
     HC --> OP
     OC --> Kafka
 ```
+
+## 배송 서비스 캐시 갱신 정책
+
+```mermaid
+sequenceDiagram
+    participant Hub as Hub 서비스
+    participant Outbox as Outbox publisher
+    participant Kafka
+    participant Shipping as 배송 서비스
+    participant Redis as 배송 Redis
+
+    Hub->>Outbox: HubCreatedEvent / HubDeletedEvent
+    Outbox->>Kafka: 커밋 후 이벤트 발행
+    Kafka->>Shipping: 경로 변경 사실 전달
+    Shipping->>Redis: DISTANCE·DURATION 경로 캐시 전체 삭제
+    Shipping->>Shipping: 다음 조회에서 최신 경로로 Cache-Aside 재계산
+```
+
+- Hub는 배송 서비스의 캐시 키·TTL·재계산 방식을 알지 않음
+- 배송 서비스는 이벤트 소비 후 캐시 무효화를 결정함
+- 현재 최단 경로 캐시는 Redis Hash에 저장하고 TTL은 30일임

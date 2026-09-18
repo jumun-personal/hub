@@ -1,34 +1,38 @@
 sequenceDiagram
     actor Client
-    participant Controller as HubWebController
-    participant Service as HubService
-    participant Hub as Hub (Entity)
-    participant Repository as HubRepository
+    participant API as HubWebController
+    participant HubService
+    participant DB as PostgreSQL
+    participant Worker as route-worker
+    participant Map as Kakao / Naver Map API
+    participant Outbox as Outbox Publisher
+    participant Kafka
+    participant Shipping as 배송 서비스
 
-    Client->>Controller: POST /api/v1/hub<br/>(CreateHubReq)
-    activate Controller
+    Client->>API: POST /api/v1/hubs
+    API->>HubService: create(CreateHubCommand)
+    HubService->>DB: 같은 트랜잭션<br/>Hub · Route skeleton · RouteBuildJob 저장
+    DB-->>HubService: commit
+    HubService-->>API: HubRes(status=PENDING/COMPLETE)
+    API-->>Client: 201 Created
 
+    Worker->>Worker: ShedLock 획득
+    Worker->>DB: Route Pair 하나 선점<br/>PENDING → PROCESSING
+    DB-->>Worker: 선점 트랜잭션 커밋
+    Note over Worker,Map: 지도 API 호출 중 DB 트랜잭션 없음
+    Worker->>Map: 거리·시간 조회
+    Map-->>Worker: RouteWeight
+    Worker->>DB: Route 2행 COMPLETE<br/>remaining_count 감소
+    Worker->>DB: 최종 성공 시<br/>Job COMPLETE · Hub COMPLETE
+    DB->>Outbox: BEFORE_COMMIT<br/>HubCreatedEvent 저장
+    DB-->>Worker: commit
+    Outbox->>Kafka: AFTER_COMMIT 발행
+    Kafka-->>Shipping: Hub/Route 변경 이벤트
+    Shipping->>Shipping: 최단 경로 캐시 무효화
 
-    Note over Controller: DTO → Command 변환
-    Controller->>Service: create(CreateHubCommand)
-    activate Service
-    
-    Service->>Hub: Hub.of(name, address)
-    activate Hub
-    Note right of Hub: 생성 + 검증 + Domain Event 발행
-    Hub-->>Service: Hub
-    deactivate Hub
-    
-    Service->>Repository: save(hub)
-    activate Repository
-    Repository-->>Service: saved Hub
-    deactivate Repository
-
-    
-    Note over Service: Domain → DTO 변환<br/>(HubRes.from)
-    
-    Service-->>Controller: HubRes
-    deactivate Service
-    
-    Controller-->>Client: 201 Created<br/>ApiRes<HubRes>
-    deactivate Controller
+    alt 일시 오류
+        Worker->>DB: Route PENDING<br/>next_retry_at + backoff
+    else 최대 재시도 초과 또는 영구 오류
+        Worker->>DB: Route FAILED<br/>failed_count 증가
+        DB->>DB: Job FAILED · Hub FAILED
+    end
